@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MetricCard } from '@/components/ui/MetricCard';
+import MainLayout from '@/components/layout/MainLayout';
 import { formatIndex, formatNumber, formatPercent } from '@/lib/utils/formatters';
 
 interface CountryDetailProps {
@@ -59,29 +60,34 @@ export function CountryDetail({ code }: CountryDetailProps) {
     .sort((a: any, b: any) => (b.metrics.collaboration_pct || 0) - (a.metrics.collaboration_pct || 0));
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <Link href="/countries" className="text-teal-600 hover:underline text-sm mb-2 inline-block">
-            ← Back to all countries
-          </Link>
-          <h1 className="text-4xl font-serif mb-2">{country.geo_id}</h1>
-          <p className="text-gray-600">Country code: {country.geo_id}</p>
-        </div>
+    <MainLayout>
+      <div className="p-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="mb-6">
+            <Link href="/countries" className="text-teal-600 hover:underline text-sm mb-2 inline-block">
+              ← Back to all countries
+            </Link>
+            <h1 className="text-4xl font-serif mb-2">{country.geo_id}</h1>
+            <p className="text-gray-600">Country code: {country.geo_id}</p>
+          </div>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <MetricCard label="Usage Rank" value="N/A" highlight />
-          <MetricCard
-            label="Usage Index"
-            value={
-              country.metrics.usage_per_capita_index
-                ? formatIndex(country.metrics.usage_per_capita_index)
-                : 'N/A'
-            }
-            description="Expected: 1.0"
-          />
+          {/* Key Metrics */}
+          <div className="grid grid-cols-4 gap-4 mb-8">
+            <MetricCard
+              label="Usage Rank"
+              value={country.metrics.usage_rank ? `#${country.metrics.usage_rank}` : 'N/A'}
+              highlight
+            />
+            <MetricCard
+              label="Usage Index"
+              value={
+                country.metrics.usage_per_capita_index
+                  ? formatIndex(country.metrics.usage_per_capita_index)
+                  : 'N/A'
+              }
+              description="Expected: 1.0"
+            />
           <MetricCard
             label="Total Usage"
             value={formatNumber(country.metrics.usage_count || 0)}
@@ -157,7 +163,8 @@ export function CountryDetail({ code }: CountryDetailProps) {
             validation) their work with AI.
           </p>
         </div>
+        </div>
       </div>
-    </div>
+    </MainLayout>
   );
 }

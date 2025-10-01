@@ -191,12 +191,53 @@ async function processAPIData() {
   return apiData;
 }
 
+function calculateTiersAndRanks(geoMap: Map<string, any>) {
+  console.log('📊 Calculating usage tiers and ranks...');
+
+  const geoArray = Array.from(geoMap.values());
+
+  // Sort by usage_pct descending
+  geoArray.sort((a, b) => (b.metrics.usage_pct || 0) - (a.metrics.usage_pct || 0));
+
+  // Calculate ranks and tiers
+  geoArray.forEach((geo, index) => {
+    geo.metrics.usage_rank = index + 1;
+
+    // Calculate tier based on percentile
+    const percentile = (index + 1) / geoArray.length;
+    if (percentile <= 0.25) {
+      geo.metrics.usage_tier = 4; // Leading (top 25%)
+    } else if (percentile <= 0.50) {
+      geo.metrics.usage_tier = 3; // Upper Middle (25-50%)
+    } else if (percentile <= 0.75) {
+      geo.metrics.usage_tier = 2; // Lower Middle (50-75%)
+    } else if (percentile <= 0.90) {
+      geo.metrics.usage_tier = 1; // Emerging (75-90%)
+    } else {
+      geo.metrics.usage_tier = 0; // Minimal (bottom 10%)
+    }
+
+    // Calculate usage per capita index (normalized against global average)
+    // AUI = (country_usage_pct / population_share) where population_share is assumed proportional
+    // For now, we'll use usage_pct as a proxy since we don't have population data
+    // A value of 1.0 means proportional to global average
+    const globalAvgPct = 100 / geoArray.length; // Equal distribution baseline
+    geo.metrics.usage_per_capita_index = (geo.metrics.usage_pct || 0) / globalAvgPct;
+  });
+
+  console.log(`✅ Calculated tiers and ranks for ${geoArray.length} geographies`);
+}
+
 async function main() {
   console.log('🚀 Starting data processing...\n');
 
   try {
     // Process Claude AI data
     const { countries, states, global } = await processClaudeAIData();
+
+    // Calculate tiers and ranks
+    calculateTiersAndRanks(countries);
+    calculateTiersAndRanks(states);
 
     // Process API data
     const apiData = await processAPIData();

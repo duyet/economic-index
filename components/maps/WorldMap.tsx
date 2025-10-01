@@ -1,103 +1,485 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+
+interface CountryData {
+  geo_id: string;
+  geography: string;
+  metrics: {
+    usage_count: number;
+    usage_pct: number;
+    usage_tier?: number;
+  };
+  collaboration: Array<{
+    mode: string;
+    metrics: {
+      collaboration_count: number;
+      collaboration_pct: number;
+    };
+  }>;
+  tasks: Array<{
+    task: string;
+    metrics: {
+      onet_task_count: number;
+      onet_task_pct: number;
+    };
+  }>;
+}
+
+type ViewMode = 'usage' | 'collaboration' | 'industries';
 
 interface WorldMapProps {
   data?: Record<string, number>;
+  showTabs?: boolean;
 }
 
-export default function WorldMap({ data = {} }: WorldMapProps) {
+export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
   const router = useRouter();
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
+  const [countryData, setCountryData] = useState<Record<string, CountryData>>({});
+  const [svgContent, setSvgContent] = useState<string>('');
+  const [viewMode, setViewMode] = useState<ViewMode>('usage');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Load country data from JSON
+    fetch('/data/countries.json')
+      .then((res) => res.json())
+      .then((countries: CountryData[]) => {
+        const dataMap: Record<string, CountryData> = {};
+        countries.forEach((country) => {
+          dataMap[country.geo_id] = country;
+        });
+        setCountryData(dataMap);
+      })
+      .catch((err) => console.error('Failed to load country data:', err));
+
+    // Load SVG
+    fetch('/maps/world.svg')
+      .then((res) => res.text())
+      .then((svg) => setSvgContent(svg))
+      .catch((err) => console.error('Failed to load SVG:', err));
+  }, []);
+
+  useEffect(() => {
+    if (!svgContent || !containerRef.current) return;
+
+    const container = containerRef.current;
+    const svgElement = container.querySelector('svg');
+    if (!svgElement) return;
+
+    // Style the SVG for responsive sizing
+    svgElement.setAttribute('width', '100%');
+    svgElement.setAttribute('height', 'auto');
+    svgElement.style.maxHeight = '500px';
+    svgElement.style.display = 'block';
+
+    // Get all country paths
+    const paths = svgElement.querySelectorAll('path[id]');
+
+    paths.forEach((path) => {
+      const countryCode = path.getAttribute('id');
+      if (!countryCode) return;
+
+      // Set color based on tier
+      const color = getColor(countryCode);
+      path.setAttribute('fill', color);
+      path.setAttribute('stroke', '#ffffff');
+      path.setAttribute('stroke-width', '0.3');
+      path.setAttribute('cursor', 'pointer');
+
+      // Add hover and click handlers
+      path.addEventListener('mouseenter', () => setHoveredCountry(countryCode));
+      path.addEventListener('mouseleave', () => setHoveredCountry(null));
+      path.addEventListener('click', () => handleCountryClick(countryCode));
+
+      // Add hover effect
+      path.addEventListener('mouseenter', function() {
+        this.setAttribute('opacity', '0.8');
+      });
+      path.addEventListener('mouseleave', function() {
+        this.setAttribute('opacity', '1');
+      });
+    });
+
+    return () => {
+      paths.forEach((path) => {
+        const newPath = path.cloneNode(true);
+        path.parentNode?.replaceChild(newPath, path);
+      });
+    };
+  }, [svgContent, countryData, viewMode]);
+
+  // Task categories mapping
+  const getTaskCategory = (task: string): string => {
+    const lowerTask = task.toLowerCase();
+    if (lowerTask.includes('computer') || lowerTask.includes('software') || lowerTask.includes('program')) return 'computer';
+    if (lowerTask.includes('design') || lowerTask.includes('art') || lowerTask.includes('creative')) return 'arts';
+    if (lowerTask.includes('teach') || lowerTask.includes('student') || lowerTask.includes('education')) return 'education';
+    if (lowerTask.includes('office') || lowerTask.includes('administrative')) return 'office';
+    if (lowerTask.includes('business') || lowerTask.includes('management')) return 'business';
+    return 'other';
+  };
+
+  const getCollaborationData = (countryCode: string): { automation: number; augmentation: number } => {
+    const country = countryData[countryCode];
+    if (!country || !country.collaboration) return { automation: 0, augmentation: 0 };
+
+    let automation = 0;
+    let augmentation = 0;
+
+    country.collaboration.forEach((collab) => {
+      const mode = collab.mode.toLowerCase();
+      if (mode.includes('directive') || mode.includes('feedback loop')) {
+        automation += collab.metrics.collaboration_pct;
+      } else if (mode.includes('learning') || mode.includes('task iteration') || mode.includes('validation')) {
+        augmentation += collab.metrics.collaboration_pct;
+      }
+    });
+
+    return { automation, augmentation };
+  };
+
+  const getTopIndustry = (countryCode: string): string => {
+    const country = countryData[countryCode];
+    if (!country || !country.tasks || country.tasks.length === 0) return 'none';
+
+    const categoryCounts: Record<string, number> = {
+      computer: 0,
+      arts: 0,
+      education: 0,
+      office: 0,
+      business: 0,
+      other: 0,
+    };
+
+    country.tasks.forEach((task) => {
+      const category = getTaskCategory(task.task);
+      categoryCounts[category] += task.metrics.onet_task_pct;
+    });
+
+    const topCategory = Object.entries(categoryCounts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
+    return topCategory;
+  };
 
   const getColor = (countryCode: string) => {
-    const value = data[countryCode] || 0;
-    if (value >= 4) return '#117763'; // Leading
-    if (value >= 3) return '#4DCAB6'; // Upper middle
-    if (value >= 2) return '#80D9CB'; // Lower middle
-    if (value >= 1) return '#B3E8E0'; // Emerging
-    return '#E6F7F5'; // Minimal
+    // If custom data provided, use it
+    if (data && data[countryCode] !== undefined) {
+      const value = data[countryCode];
+      if (value >= 4) return '#117763'; // Leading
+      if (value >= 3) return '#4DCAB6'; // Upper middle
+      if (value >= 2) return '#80D9CB'; // Lower middle
+      if (value >= 1) return '#B3E8E0'; // Emerging
+      return '#E6F7F5'; // Minimal
+    }
+
+    const country = countryData[countryCode];
+    if (!country) return '#E5E7EB'; // Gray for no data
+
+    // Usage tier view
+    if (viewMode === 'usage') {
+      const tier = country.metrics.usage_tier;
+      if (tier === 4) return '#117763'; // Leading
+      if (tier === 3) return '#4DCAB6'; // Upper middle
+      if (tier === 2) return '#80D9CB'; // Lower middle
+      if (tier === 1) return '#B3E8E0'; // Emerging
+      return '#E6F7F5'; // Minimal
+    }
+
+    // Collaboration view
+    if (viewMode === 'collaboration') {
+      const { automation, augmentation } = getCollaborationData(countryCode);
+      if (automation === 0 && augmentation === 0) return '#E5E7EB'; // No data
+
+      // Determine dominant mode
+      if (automation > augmentation) {
+        return '#B4A7D6'; // Purple for automation
+      } else {
+        return '#A8C5A0'; // Sage green for augmentation
+      }
+    }
+
+    // Industries view
+    if (viewMode === 'industries') {
+      const topIndustry = getTopIndustry(countryCode);
+      const industryColors: Record<string, string> = {
+        computer: '#D4C5A0', // Beige
+        arts: '#F98D7F', // Coral
+        education: '#6B8DD6', // Blue
+        office: '#9CA3AF', // Gray
+        business: '#96C1A2', // Sage
+        other: '#E5E7EB', // Light gray
+        none: '#E5E7EB',
+      };
+      return industryColors[topIndustry] || '#E5E7EB';
+    }
+
+    return '#E5E7EB';
+  };
+
+  const getCountryInfo = (countryCode: string) => {
+    const country = countryData[countryCode];
+    if (!country) return null;
+
+    const tierNames = ['Minimal', 'Emerging', 'Lower Middle', 'Upper Middle', 'Leading'];
+    const tier = country.metrics.usage_tier || 0;
+
+    // Base info
+    const info: any = {
+      name: countryCode,
+      usageCount: country.metrics.usage_count.toLocaleString(),
+      usagePct: (country.metrics.usage_pct * 100).toFixed(2),
+      tier: tierNames[tier],
+    };
+
+    // Add collaboration breakdown if in collaboration mode
+    if (viewMode === 'collaboration') {
+      const { automation, augmentation } = getCollaborationData(countryCode);
+      info.automation = automation.toFixed(1);
+      info.augmentation = augmentation.toFixed(1);
+      info.dominant = automation > augmentation ? 'Automation' : 'Augmentation';
+    }
+
+    // Add industry breakdown if in industries mode
+    if (viewMode === 'industries') {
+      const topIndustry = getTopIndustry(countryCode);
+      const industryNames: Record<string, string> = {
+        computer: 'Computer & mathematical',
+        arts: 'Arts & entertainment',
+        education: 'Educational instruction',
+        office: 'Office & administrative',
+        business: 'Business & management',
+        other: 'Other',
+        none: 'No data',
+      };
+      info.topIndustry = industryNames[topIndustry];
+
+      // Get task count for this industry
+      if (country.tasks && country.tasks.length > 0) {
+        const taskCount = country.tasks.filter(t => getTaskCategory(t.task) === topIndustry).length;
+        info.taskCount = taskCount;
+      }
+    }
+
+    return info;
   };
 
   const handleCountryClick = (countryCode: string) => {
     router.push(`/country/${countryCode.toLowerCase()}`);
   };
 
-  const countries = [
-    // North America
-    { code: 'US', name: 'United States', path: 'M 140 120 L 145 110 L 155 105 L 170 105 L 185 110 L 195 115 L 210 115 L 225 120 L 235 130 L 240 145 L 245 160 L 245 175 L 240 185 L 230 190 L 215 190 L 200 185 L 185 180 L 175 175 L 165 170 L 155 165 L 150 155 L 145 140 L 140 125 Z' },
-    { code: 'CA', name: 'Canada', path: 'M 140 50 L 160 45 L 180 45 L 200 50 L 220 55 L 235 65 L 245 80 L 250 95 L 245 105 L 235 110 L 220 110 L 200 105 L 180 100 L 160 95 L 145 85 L 135 70 L 135 55 Z' },
-    { code: 'MX', name: 'Mexico', path: 'M 145 195 L 160 190 L 175 190 L 185 195 L 195 205 L 195 215 L 185 220 L 170 220 L 155 215 L 145 205 Z' },
+  const renderLegend = () => {
+    if (viewMode === 'usage') {
+      return (
+        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#117763' }}></div>
+            <span>Leading</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#4DCAB6' }}></div>
+            <span>Upper Middle</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#80D9CB' }}></div>
+            <span>Lower Middle</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#B3E8E0' }}></div>
+            <span>Emerging</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#E6F7F5' }}></div>
+            <span>Minimal</span>
+          </div>
+        </div>
+      );
+    }
 
-    // South America
-    { code: 'BR', name: 'Brazil', path: 'M 290 240 L 305 235 L 320 235 L 335 245 L 345 260 L 350 280 L 345 300 L 335 315 L 320 325 L 305 325 L 290 315 L 280 300 L 275 280 L 280 260 L 285 245 Z' },
-    { code: 'AR', name: 'Argentina', path: 'M 275 330 L 285 325 L 295 330 L 300 345 L 300 365 L 295 385 L 285 395 L 275 390 L 270 375 L 270 355 L 272 340 Z' },
+    if (viewMode === 'collaboration') {
+      return (
+        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#A8C5A0' }}></div>
+            <span>Augmentation</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#B4A7D6' }}></div>
+            <span>Automation</span>
+          </div>
+        </div>
+      );
+    }
 
-    // Europe
-    { code: 'GB', name: 'United Kingdom', path: 'M 475 105 L 482 102 L 488 105 L 490 112 L 485 118 L 478 118 L 472 113 L 472 108 Z' },
-    { code: 'FR', name: 'France', path: 'M 485 125 L 495 122 L 505 125 L 510 135 L 505 145 L 495 148 L 485 145 L 480 135 Z' },
-    { code: 'DE', name: 'Germany', path: 'M 510 108 L 520 105 L 530 108 L 535 118 L 530 128 L 520 130 L 510 125 L 508 115 Z' },
-    { code: 'ES', name: 'Spain', path: 'M 465 145 L 478 142 L 490 145 L 495 155 L 488 162 L 475 162 L 465 157 L 463 150 Z' },
-    { code: 'IT', name: 'Italy', path: 'M 515 145 L 522 142 L 528 148 L 530 158 L 525 168 L 518 170 L 513 165 L 512 155 Z' },
+    if (viewMode === 'industries') {
+      return (
+        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#D4C5A0' }}></div>
+            <span>Computer and mathematical</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F98D7F' }}></div>
+            <span>Arts, design, entertainment</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#6B8DD6' }}></div>
+            <span>Educational instruction</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#9CA3AF' }}></div>
+            <span>Office and administrative</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#96C1A2' }}></div>
+            <span>Business and management</span>
+          </div>
+        </div>
+      );
+    }
 
-    // Africa
-    { code: 'EG', name: 'Egypt', path: 'M 530 170 L 540 168 L 548 172 L 550 182 L 545 190 L 538 192 L 530 188 L 528 178 Z' },
-    { code: 'ZA', name: 'South Africa', path: 'M 540 330 L 550 328 L 560 332 L 565 342 L 560 352 L 550 355 L 540 350 L 538 340 Z' },
-    { code: 'NG', name: 'Nigeria', path: 'M 505 210 L 515 208 L 523 212 L 525 220 L 520 228 L 512 230 L 505 225 L 503 218 Z' },
-
-    // Middle East
-    { code: 'SA', name: 'Saudi Arabia', path: 'M 560 180 L 575 178 L 585 185 L 588 195 L 582 205 L 570 208 L 560 203 L 558 190 Z' },
-    { code: 'AE', name: 'UAE', path: 'M 595 195 L 602 193 L 607 198 L 607 205 L 602 210 L 595 210 L 592 203 Z' },
-
-    // Asia (Note: CN/China not in dataset, space reserved for future)
-    { code: 'IN', name: 'India', path: 'M 650 180 L 665 175 L 680 180 L 690 195 L 690 215 L 682 230 L 668 238 L 655 235 L 645 220 L 645 200 Z' },
-    { code: 'JP', name: 'Japan', path: 'M 820 130 L 830 128 L 838 135 L 840 148 L 835 160 L 828 165 L 820 160 L 818 148 L 820 138 Z' },
-    { code: 'KR', name: 'South Korea', path: 'M 800 145 L 807 143 L 812 148 L 812 156 L 807 162 L 800 162 L 797 155 Z' },
-    { code: 'ID', name: 'Indonesia', path: 'M 720 245 L 750 240 L 780 245 L 795 255 L 790 265 L 770 270 L 745 268 L 720 260 Z' },
-    { code: 'TH', name: 'Thailand', path: 'M 695 220 L 705 218 L 712 225 L 712 238 L 705 245 L 698 243 L 693 235 Z' },
-    { code: 'VN', name: 'Vietnam', path: 'M 715 215 L 723 213 L 728 220 L 728 235 L 723 243 L 716 243 L 713 233 Z' },
-    { code: 'SG', name: 'Singapore', path: 'M 710 250 L 715 249 L 717 253 L 715 257 L 710 257 L 709 253 Z' },
-
-    // Oceania
-    { code: 'AU', name: 'Australia', path: 'M 750 300 L 780 295 L 810 305 L 835 320 L 845 340 L 840 360 L 820 375 L 790 380 L 760 375 L 740 360 L 735 340 L 740 320 Z' },
-    { code: 'NZ', name: 'New Zealand', path: 'M 880 360 L 890 358 L 895 368 L 895 380 L 888 388 L 880 386 L 877 375 Z' },
-  ];
+    return null;
+  };
 
   return (
-    <div className="relative w-full bg-gradient-to-br from-blue-50 to-teal-50 rounded-lg p-4">
-      <svg
-        viewBox="0 0 950 450"
-        className="w-full h-auto"
-        style={{ maxHeight: '450px' }}
-      >
-        {/* Ocean background */}
-        <rect x="0" y="0" width="950" height="450" fill="#E0F2FE" />
-
-        {/* Countries */}
-        {countries.map((country) => (
-          <path
-            key={country.code}
-            d={country.path}
-            fill={getColor(country.code)}
-            stroke="#ffffff"
-            strokeWidth="1.5"
-            className="hover:brightness-90 cursor-pointer transition-all"
-            onClick={() => handleCountryClick(country.code)}
-            onMouseEnter={() => setHoveredCountry(country.name)}
-            onMouseLeave={() => setHoveredCountry(null)}
-          >
-            <title>{country.name}</title>
-          </path>
-        ))}
-      </svg>
-
-      {/* Tooltip */}
-      {hoveredCountry && (
-        <div className="absolute top-4 left-4 bg-white px-4 py-2 rounded-lg shadow-lg border border-gray-200 text-sm text-gray-900 font-medium pointer-events-none">
-          {hoveredCountry}
+    <div className="relative w-full overflow-hidden">
+      {/* Tabs */}
+      {showTabs && (
+        <div className="mb-6 border-b border-gray-200">
+          <div className="flex gap-8">
+            <button
+              onClick={() => setViewMode('usage')}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                viewMode === 'usage'
+                  ? 'border-teal-600 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Usage Index
+            </button>
+            <button
+              onClick={() => setViewMode('collaboration')}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                viewMode === 'collaboration'
+                  ? 'border-teal-600 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Augmentation vs. automation
+            </button>
+            <button
+              onClick={() => setViewMode('industries')}
+              className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
+                viewMode === 'industries'
+                  ? 'border-teal-600 text-teal-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Top industries
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Map Container */}
+      <div className="relative overflow-visible">
+        <div
+          ref={containerRef}
+          className="w-full overflow-visible"
+          dangerouslySetInnerHTML={{ __html: svgContent }}
+        />
+
+        {/* Enhanced Tooltip */}
+        {hoveredCountry && (
+          <div className="fixed top-20 left-8 bg-white px-4 py-3 rounded-lg shadow-xl border border-gray-200 pointer-events-none z-50 max-w-xs">
+            {(() => {
+              const info = getCountryInfo(hoveredCountry);
+
+              return (
+                <div className="space-y-2">
+                  <div className="font-semibold text-gray-900 border-b border-gray-100 pb-2">
+                    {hoveredCountry}
+                  </div>
+                  {info && (
+                    <>
+                      {/* Usage Index View */}
+                      {viewMode === 'usage' && (
+                        <>
+                          <div className="text-xs text-gray-600">
+                            <span className="text-gray-500">Tier:</span>{' '}
+                            <span className="font-medium text-teal-700">{info.tier}</span>
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            <span className="text-gray-500">Usage:</span>{' '}
+                            <span className="font-medium">{info.usageCount}</span>
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            <span className="text-gray-500">Percentage:</span>{' '}
+                            <span className="font-medium">{info.usagePct}%</span>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Collaboration View */}
+                      {viewMode === 'collaboration' && (
+                        <>
+                          <div className="text-xs text-gray-600">
+                            <span className="text-gray-500">Dominant:</span>{' '}
+                            <span className="font-medium text-purple-700">{info.dominant}</span>
+                          </div>
+                          <div className="pt-1 space-y-1">
+                            <div className="text-xs text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#A8C5A0' }}></div>
+                                <span className="text-gray-500">Augmentation:</span>
+                                <span className="font-medium">{info.augmentation}%</span>
+                              </div>
+                            </div>
+                            <div className="text-xs text-gray-600">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#B4A7D6' }}></div>
+                                <span className="text-gray-500">Automation:</span>
+                                <span className="font-medium">{info.automation}%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* Industries View */}
+                      {viewMode === 'industries' && (
+                        <>
+                          <div className="text-xs text-gray-600">
+                            <span className="text-gray-500">Top Industry:</span>{' '}
+                            <span className="font-medium text-blue-700">{info.topIndustry}</span>
+                          </div>
+                          {info.taskCount && (
+                            <div className="text-xs text-gray-600">
+                              <span className="text-gray-500">Tasks:</span>{' '}
+                              <span className="font-medium">{info.taskCount}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      <div className="text-xs text-gray-400 italic pt-1 border-t border-gray-100 mt-2">
+                        Click to view details
+                      </div>
+                    </>
+                  )}
+                  {!info && (
+                    <div className="text-xs text-gray-500 italic">No data available</div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      {renderLegend()}
     </div>
   );
 }

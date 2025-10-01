@@ -47,31 +47,7 @@ export default function Home() {
           <p className="text-sm text-gray-600 mb-6">
             Explore AI adoption patterns across 173 countries worldwide
           </p>
-          <div className="bg-cream-50 rounded-lg p-6 border border-gray-100">
-            <WorldMap />
-          </div>
-          <div className="mt-4 flex items-center gap-4 text-xs text-gray-600">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#117763' }}></div>
-              <span>Leading</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#4DCAB6' }}></div>
-              <span>Upper Middle</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#80D9CB' }}></div>
-              <span>Lower Middle</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#B3E8E0' }}></div>
-              <span>Emerging</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded" style={{ backgroundColor: '#E6F7F5' }}></div>
-              <span>Minimal</span>
-            </div>
-          </div>
+          <WorldMap showTabs={true} />
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-8 shadow-sm">
