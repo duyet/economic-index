@@ -15,13 +15,13 @@ export async function generateStaticParams() {
       code: country.geo_id.toLowerCase(),
     }));
 
-    // Also include all countries from the world map
+    // Also include all countries from the world map (excluding CN - not in dataset)
     const mapCountries = [
       'us', 'ca', 'mx', 'br', 'ar',  // Americas
       'gb', 'fr', 'de', 'es', 'it',  // Europe
       'eg', 'za', 'ng',              // Africa
       'sa', 'ae',                    // Middle East
-      'cn', 'in', 'jp', 'kr', 'id', 'th', 'vn', 'sg',  // Asia
+      'in', 'jp', 'kr', 'id', 'th', 'vn', 'sg',  // Asia
       'au', 'nz'                     // Oceania
     ];
 
@@ -34,12 +34,12 @@ export async function generateStaticParams() {
     return Array.from(allCodes).map(code => ({ code }));
   } catch (error) {
     console.error('Error reading countries data:', error);
-    // Fallback to comprehensive list including map countries
+    // Fallback to comprehensive list including map countries (excluding CN - not in dataset)
     const fallbackCountries = [
       'us', 'ca', 'mx', 'br', 'ar',
       'gb', 'fr', 'de', 'es', 'it',
       'eg', 'za', 'ng', 'sa', 'ae',
-      'cn', 'in', 'jp', 'kr', 'id', 'th', 'vn', 'sg',
+      'in', 'jp', 'kr', 'id', 'th', 'vn', 'sg',
       'au', 'nz'
     ];
     return fallbackCountries.map((code) => ({ code }));

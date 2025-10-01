@@ -50,8 +50,7 @@ export default function WorldMap({ data = {} }: WorldMapProps) {
     { code: 'SA', name: 'Saudi Arabia', path: 'M 560 180 L 575 178 L 585 185 L 588 195 L 582 205 L 570 208 L 560 203 L 558 190 Z' },
     { code: 'AE', name: 'UAE', path: 'M 595 195 L 602 193 L 607 198 L 607 205 L 602 210 L 595 210 L 592 203 Z' },
 
-    // Asia
-    { code: 'CN', name: 'China', path: 'M 700 110 L 725 105 L 750 110 L 770 125 L 780 145 L 775 165 L 760 175 L 740 175 L 720 168 L 705 155 L 695 135 L 695 120 Z' },
+    // Asia (Note: CN/China not in dataset, space reserved for future)
     { code: 'IN', name: 'India', path: 'M 650 180 L 665 175 L 680 180 L 690 195 L 690 215 L 682 230 L 668 238 L 655 235 L 645 220 L 645 200 Z' },
     { code: 'JP', name: 'Japan', path: 'M 820 130 L 830 128 L 838 135 L 840 148 L 835 160 L 828 165 L 820 160 L 818 148 L 820 138 Z' },
     { code: 'KR', name: 'South Korea', path: 'M 800 145 L 807 143 L 812 148 L 812 156 L 807 162 L 800 162 L 797 155 Z' },
