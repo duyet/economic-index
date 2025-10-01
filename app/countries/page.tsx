@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import MainLayout from '@/components/layout/MainLayout';
 import { formatIndex, formatNumber } from '@/lib/utils/formatters';
 
 export default function CountriesPage() {
@@ -24,7 +25,11 @@ export default function CountriesPage() {
   }, []);
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <MainLayout>
+        <div className="p-8">Loading...</div>
+      </MainLayout>
+    );
   }
 
   // Filter and sort countries
@@ -44,10 +49,10 @@ export default function CountriesPage() {
     });
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-serif mb-2">Countries</h1>
-        <p className="text-gray-600 mb-8">
+    <MainLayout>
+      <div className="max-w-6xl">
+        <h1 className="text-5xl font-serif mb-4 text-gray-900 font-light leading-tight">Countries</h1>
+        <p className="text-gray-700 mb-8 leading-relaxed">
           Browse AI adoption patterns across {countries.length} countries worldwide
         </p>
 
@@ -116,6 +121,6 @@ export default function CountriesPage() {
           </div>
         )}
       </div>
-    </div>
+    </MainLayout>
   );
 }

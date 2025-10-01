@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import MainLayout from '@/components/layout/MainLayout';
 import { formatNumber, formatPercent } from '@/lib/utils/formatters';
 import { SOC_MAJOR_GROUPS } from '@/lib/data/constants';
 
@@ -50,26 +51,30 @@ export default function JobsPage() {
   }, [tasks, searchTerm, selectedSOC]);
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <MainLayout>
+        <div>Loading...</div>
+      </MainLayout>
+    );
   }
 
   // Get unique SOC codes
   const socCodes: string[] = Array.from(new Set(tasks.map((t: any) => t.soc_code as string)));
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-serif mb-2">Explore by Job</h1>
-        <p className="text-gray-600 mb-8">
+    <MainLayout>
+      <div className="max-w-6xl">
+        <h1 className="text-5xl font-serif mb-4 text-gray-900 font-light leading-tight">Explore by Job</h1>
+        <p className="text-gray-700 mb-6 leading-relaxed">
           People use AI to automate certain parts of their jobs, like data entry. When exploring
           problems or ideas, Claude becomes a collaborative partner instead. Other tasks remain
           firmly in human hands.
         </p>
 
-        <div className="mb-6 text-sm text-gray-600 bg-gray-50 p-4 rounded-lg">
+        <div className="mb-8 text-sm text-gray-700 bg-cream-50 p-6 rounded-lg border border-gray-200">
           <p>
             We&apos;ve grouped task data into job titles based on a standard called O*NET-SOC
-            classification. Hover over the squares for a detailed breakdown.
+            classification. Explore the data below for detailed breakdowns.
           </p>
         </div>
 
@@ -104,45 +109,49 @@ export default function JobsPage() {
           {filteredTasks.length} occupation{filteredTasks.length !== 1 ? 's' : ''}
         </div>
 
-        {/* Task Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTasks.slice(0, 100).map((task: any, index: number) => (
-            <div
-              key={index}
-              className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-md transition-all"
-            >
-              <div className="mb-3">
-                <h3 className="font-medium text-sm mb-1 line-clamp-2">{task.task}</h3>
-                <div className="text-xs text-gray-500">{task.soc_title}</div>
-              </div>
+        {/* Task Grid - Compact Design */}
+        <div className="space-y-2">
+          {filteredTasks.slice(0, 100).map((task: any, index: number) => {
+            const pct = task.metrics.onet_task_pct || 0;
+            return (
+              <div
+                key={index}
+                className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  {/* Task Info */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-sm text-gray-900 mb-0.5 truncate">{task.task}</h3>
+                    <div className="text-xs text-gray-600">{task.soc_title}</div>
+                  </div>
 
-              {/* Simple visualization - waffle chart placeholder */}
-              <div className="grid grid-cols-10 gap-0.5 mb-3">
-                {Array.from({ length: 100 }).map((_, i) => {
-                  const pct = task.metrics.onet_task_pct || 0;
-                  const filled = i < Math.round(pct * 10);
-                  return (
-                    <div
-                      key={i}
-                      className="aspect-square rounded-sm"
-                      style={{
-                        backgroundColor: filled ? '#4DCAB6' : '#E5E7EB',
-                      }}
-                    />
-                  );
-                })}
-              </div>
+                  {/* Progress Bar */}
+                  <div className="w-48 flex-shrink-0">
+                    <div className="h-6 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-teal-500 flex items-center justify-end pr-2"
+                        style={{ width: `${Math.max(pct * 100, 0)}%` }}
+                      >
+                        {pct > 0.15 && (
+                          <span className="text-xs font-medium text-white">
+                            {formatPercent(pct)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="flex justify-between text-xs">
-                <span className="text-gray-600">
-                  {formatNumber(task.metrics.onet_task_count || 0)} uses
-                </span>
-                <span className="font-medium">
-                  {formatPercent(task.metrics.onet_task_pct || 0)} usage
-                </span>
+                  {/* Stats */}
+                  <div className="text-right flex-shrink-0 w-24">
+                    <div className="text-sm font-medium text-gray-900">
+                      {formatNumber(task.metrics.onet_task_count || 0)}
+                    </div>
+                    <div className="text-xs text-gray-600">uses</div>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {filteredTasks.length === 0 && (
@@ -157,6 +166,6 @@ export default function JobsPage() {
           </div>
         )}
       </div>
-    </div>
+    </MainLayout>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UsageIndexChart } from '@/components/charts/UsageIndexChart';
 import { CollaborationChart } from '@/components/charts/CollaborationChart';
@@ -26,7 +27,11 @@ export default function ComparePage() {
   }, []);
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <MainLayout>
+        <div className="p-8">Loading...</div>
+      </MainLayout>
+    );
   }
 
   const selectedData = countries.filter((c) =>
@@ -49,14 +54,11 @@ export default function ComparePage() {
   };
 
   return (
-    <div className="p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <Link href="/" className="text-teal-600 hover:underline text-sm mb-2 inline-block">
-            ← Back to home
-          </Link>
-          <h1 className="text-4xl font-serif mb-2">Compare Countries</h1>
-          <p className="text-gray-600">
+    <MainLayout>
+      <div className="max-w-6xl">
+        <div className="mb-8">
+          <h1 className="text-5xl font-serif mb-4 text-gray-900 font-light leading-tight">Compare Countries</h1>
+          <p className="text-gray-700 leading-relaxed">
             Select up to 10 countries to compare AI adoption patterns, usage metrics, and
             collaboration modes.
           </p>
@@ -175,6 +177,6 @@ export default function ComparePage() {
           </div>
         )}
       </div>
-    </div>
+    </MainLayout>
   );
 }
