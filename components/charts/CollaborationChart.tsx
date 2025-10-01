@@ -72,11 +72,11 @@ export function CollaborationChart({
 
   const automation = data
     .filter((d) => automationModes.includes(d.mode))
-    .reduce((sum, d) => sum + d.pct, 0);
+    .reduce((sum, d) => sum + (d.pct || 0), 0);
 
   const augmentation = data
     .filter((d) => augmentationModes.includes(d.mode))
-    .reduce((sum, d) => sum + d.pct, 0);
+    .reduce((sum, d) => sum + (d.pct || 0), 0);
 
   return (
     <Card>
@@ -117,7 +117,7 @@ export function CollaborationChart({
                     <div
                       className="h-2 rounded-full"
                       style={{
-                        width: `${item.pct}%`,
+                        width: `${item.pct || 0}%`,
                         backgroundColor: automationModes.includes(item.mode)
                           ? 'hsl(173, 58%, 39%)'
                           : 'hsl(120, 35%, 50%)',
@@ -125,7 +125,7 @@ export function CollaborationChart({
                     />
                   </div>
                   <span className="font-mono text-sm font-medium w-12 text-right">
-                    {item.pct.toFixed(1)}%
+                    {(item.pct || 0).toFixed(1)}%
                   </span>
                 </div>
               </div>
