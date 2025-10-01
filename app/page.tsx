@@ -23,8 +23,13 @@ export default function Home() {
               </Link>
             </li>
             <li>
-              <Link href="/state" className="block py-2 px-3 rounded hover:bg-gray-50">
-                State usage
+              <Link href="/countries" className="block py-2 px-3 rounded hover:bg-gray-50">
+                Countries
+              </Link>
+            </li>
+            <li>
+              <Link href="/compare" className="block py-2 px-3 rounded hover:bg-gray-50">
+                Compare
               </Link>
             </li>
             <li>
@@ -89,9 +94,10 @@ export default function Home() {
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-medium mb-4">Getting Started</h3>
             <ul className="space-y-2 text-gray-600">
-              <li>• View <Link href="/us" className="text-teal-600 hover:underline">US state adoption patterns</Link></li>
-              <li>• Explore <Link href="/jobs" className="text-teal-600 hover:underline">job-specific AI usage</Link></li>
-              <li>• Download the full dataset for your own analysis</li>
+              <li>• Browse <Link href="/countries" className="text-teal-600 hover:underline">173 countries worldwide</Link></li>
+              <li>• Compare <Link href="/compare" className="text-teal-600 hover:underline">adoption patterns across countries</Link></li>
+              <li>• View <Link href="/us" className="text-teal-600 hover:underline">US state rankings</Link></li>
+              <li>• Explore <Link href="/jobs" className="text-teal-600 hover:underline">974 job categories</Link></li>
             </ul>
           </div>
         </div>
