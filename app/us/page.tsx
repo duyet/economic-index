@@ -113,7 +113,7 @@ export default function USPage() {
         <div className="mt-6 bg-teal-50 rounded-lg border border-teal-200 p-4">
           <h3 className="font-medium text-teal-900 mb-2">About the Usage Index</h3>
           <p className="text-sm text-teal-800">
-            The Anthropic AI Usage Index (AUI) shows whether a state uses Claude more (>1) or
+            The Anthropic AI Usage Index (AUI) shows whether a state uses Claude more (&gt;1) or
             less (&lt;1) than expected based on its working-age population. An index of 3.82x
             means usage is 3.82 times higher than the state&apos;s population share would suggest.
           </p>
