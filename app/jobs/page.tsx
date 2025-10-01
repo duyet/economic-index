@@ -2,68 +2,69 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
-import { WaffleChart } from '@/components/charts/WaffleChart';
+import { TaskWaffleChart } from '@/components/charts/TaskWaffleChart';
 import { formatPercent } from '@/lib/utils/formatters';
 import { SOC_MAJOR_GROUPS } from '@/lib/data/constants';
 
 export default function JobsPage() {
-  const [globalData, setGlobalData] = useState<any>(null);
+  const [occupations, setOccupations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'usage' | 'name'>('usage');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [displayCount, setDisplayCount] = useState(100);
 
   useEffect(() => {
-    fetch('/data/global.json')
+    fetch('/data/occupations.json')
       .then((res) => res.json())
       .then((data) => {
-        setGlobalData(data);
+        setOccupations(data);
         setLoading(false);
       })
       .catch((error) => {
-        console.error('Error loading global data:', error);
+        console.error('Error loading occupations data:', error);
         setLoading(false);
       });
   }, []);
 
-  const tasks = useMemo(() => {
-    if (!globalData?.tasks) return [];
+  const processedOccupations = useMemo(() => {
+    if (!occupations || occupations.length === 0) return [];
 
-    return globalData.tasks
-      .filter((t: any) => t.task !== 'not_classified' && t.task !== 'none')
-      .map((t: any) => {
-        // Extract SOC code from task (simplified - would need proper mapping)
-        const socCode = '15'; // Default to Computer/Math for demo
-
-        // Simulate collaboration mode percentages for waffle chart
-        const directive = Math.random() * 80; // Automation
-        const learning = Math.random() * (100 - directive); // Augmentation
-
+    return occupations
+      .map((occ: any) => {
         return {
-          ...t,
-          soc_code: socCode,
-          soc_title: SOC_MAJOR_GROUPS[socCode] || 'Computer and Mathematical',
-          collaboration: {
-            directive,
-            learning,
-            other: 100 - directive - learning
-          }
+          ...occ,
+          soc_title: SOC_MAJOR_GROUPS[occ.soc_major_group] || 'Other',
         };
       })
       .sort((a: any, b: any) => {
         if (sortBy === 'usage') {
-          return (b.metrics.onet_task_pct || 0) - (a.metrics.onet_task_pct || 0);
+          return (b.total_usage_pct || 0) - (a.total_usage_pct || 0);
         }
-        return a.task.localeCompare(b.task);
+        return a.occupation_title.localeCompare(b.occupation_title);
       });
-  }, [globalData, sortBy]);
+  }, [occupations, sortBy]);
 
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((task: any) => {
+  const filteredOccupations = useMemo(() => {
+    return processedOccupations.filter((occ: any) => {
       const matchesSearch = searchTerm === '' ||
-        task.task.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
+        occ.occupation_title.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = categoryFilter === 'all' ||
+        occ.soc_major_group === categoryFilter;
+      return matchesSearch && matchesCategory;
     });
-  }, [tasks, searchTerm]);
+  }, [processedOccupations, searchTerm, categoryFilter]);
+
+  // Get unique categories from occupations
+  const categories = useMemo(() => {
+    const uniqueCategories = new Map<string, string>();
+    processedOccupations.forEach((occ: any) => {
+      if (occ.soc_major_group && occ.soc_title) {
+        uniqueCategories.set(occ.soc_major_group, occ.soc_title);
+      }
+    });
+    return Array.from(uniqueCategories.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [processedOccupations]);
 
   if (loading) {
     return (
@@ -84,18 +85,18 @@ export default function JobsPage() {
         </p>
 
         {/* Legend */}
-        <div className="mb-8 flex items-start gap-6">
+        <div className="mb-6 flex items-start gap-6 flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#5A9770' }}></div>
-            <span className="text-sm text-gray-700">Mostly automated tasks</span>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#5A9770' }}></div>
+            <span className="text-sm text-gray-600">Mostly automated tasks</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#B8A3D6' }}></div>
-            <span className="text-sm text-gray-700">Mostly augmented tasks</span>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#B8A3D6' }}></div>
+            <span className="text-sm text-gray-600">Mostly augmented tasks</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#E8E4DC' }}></div>
-            <span className="text-sm text-gray-700">Tasks that don&apos;t appear in our data</span>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#E8E4DC' }}></div>
+            <span className="text-sm text-gray-600">Tasks that don&apos;t appear in our data</span>
           </div>
         </div>
 
@@ -110,70 +111,123 @@ export default function JobsPage() {
         </div>
 
         {/* Controls */}
-        <div className="flex gap-4 mb-6">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Search for a job"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
-            />
-            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        <div className="space-y-4 mb-6">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Search for a job"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+              />
+              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'usage' | 'name')}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white min-w-[200px]"
+            >
+              <option value="usage">Sort By: Usage Rank</option>
+              <option value="name">Sort By: Name</option>
+            </select>
           </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'usage' | 'name')}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white min-w-[200px]"
-          >
-            <option value="usage">Sort By: Usage Rank</option>
-            <option value="name">Sort By: Name</option>
-          </select>
+
+          {/* Category Filter */}
+          {categories.length > 0 && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-medium text-gray-700">Category:</span>
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  categoryFilter === 'all'
+                    ? 'bg-teal-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                All
+              </button>
+              {categories.slice(0, 6).map(([code, title]) => (
+                <button
+                  key={code}
+                  onClick={() => setCategoryFilter(code)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    categoryFilter === code
+                      ? 'bg-teal-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {title}
+                </button>
+              ))}
+              {categoryFilter !== 'all' && !categories.slice(0, 6).find(([code]) => code === categoryFilter) && (
+                <button
+                  onClick={() => setCategoryFilter('all')}
+                  className="px-2 py-1.5 text-sm text-teal-600 hover:text-teal-700"
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Results Count */}
         <div className="mb-6 text-sm text-gray-600 text-center">
-          {filteredTasks.length} occupations
+          {filteredOccupations.length} occupations
         </div>
 
-        {/* Task Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredTasks.slice(0, 100).map((task: any, index: number) => (
+        {/* Occupations Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+          {filteredOccupations.slice(0, displayCount).map((occ: any, index: number) => (
             <div
               key={index}
-              className="bg-white rounded-lg border border-gray-200 p-4 hover:border-teal-300 hover:shadow-md transition-all"
+              className="bg-white rounded-lg border border-gray-200 p-4 hover:border-gray-300 hover:shadow-md transition-all duration-150 cursor-pointer"
             >
               <div className="mb-3">
-                <h3 className="font-medium text-sm text-gray-900 mb-1 line-clamp-2 min-h-[2.5rem]">
-                  {task.task}
+                <h3 className="font-medium text-[15px] text-gray-900 mb-1.5 line-clamp-2 min-h-[2.6rem] leading-[1.3]">
+                  {occ.occupation_title}
                 </h3>
-                <div className="text-xs text-gray-600">{task.soc_title}</div>
+                <div className="text-xs text-gray-500">
+                  {occ.soc_title}
+                </div>
               </div>
 
-              {/* Waffle Chart */}
+              {/* Task Waffle Chart */}
               <div className="mb-3">
-                <WaffleChart data={task.collaboration} />
+                <TaskWaffleChart tasks={occ.tasks || []} />
               </div>
 
               {/* Usage Percentage */}
               <div className="text-xs text-gray-600">
-                {formatPercent(task.metrics.onet_task_pct || 0)} usage
+                {formatPercent(occ.total_usage_pct || 0)} usage
               </div>
             </div>
           ))}
         </div>
 
-        {filteredTasks.length === 0 && (
+        {filteredOccupations.length === 0 && (
           <div className="text-center py-12 text-gray-500">
-            No tasks found matching your criteria
+            No occupations found matching your criteria
           </div>
         )}
 
-        {filteredTasks.length > 100 && (
+        {filteredOccupations.length > displayCount && (
+          <div className="text-center mt-8">
+            <button
+              onClick={() => setDisplayCount(prev => Math.min(prev + 100, filteredOccupations.length))}
+              className="px-6 py-3 bg-teal-600 text-white font-medium rounded-lg hover:bg-teal-700 transition-colors"
+            >
+              Load More ({filteredOccupations.length - displayCount} remaining)
+            </button>
+          </div>
+        )}
+
+        {displayCount >= filteredOccupations.length && filteredOccupations.length > 100 && (
           <div className="text-center mt-8 text-sm text-gray-600">
-            Showing first 100 of {filteredTasks.length} occupations
+            Showing all {filteredOccupations.length} occupations
           </div>
         )}
       </div>
