@@ -29,22 +29,28 @@ export function CountryDetail({ code }: CountryDetailProps) {
   }, [code]);
 
   if (loading) {
-    return <div className="p-8">Loading...</div>;
+    return (
+      <MainLayout>
+        <div className="p-8">Loading...</div>
+      </MainLayout>
+    );
   }
 
   if (!country) {
     return (
-      <div className="p-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-4xl font-serif mb-4">Country Not Found</h1>
-          <p className="text-gray-600 mb-6">
-            No data available for country code: <span className="font-mono">{code}</span>
-          </p>
-          <Link href="/" className="text-teal-600 hover:underline">
-            ← Back to home
-          </Link>
+      <MainLayout>
+        <div className="p-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <h1 className="text-4xl font-serif mb-4">Country Not Found</h1>
+            <p className="text-gray-600 mb-6">
+              No data available for country code: <span className="font-mono">{code}</span>
+            </p>
+            <Link href="/" className="text-teal-600 hover:underline">
+              ← Back to home
+            </Link>
+          </div>
         </div>
-      </div>
+      </MainLayout>
     );
   }
 

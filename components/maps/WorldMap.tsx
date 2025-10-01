@@ -40,6 +40,7 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
   const [countryData, setCountryData] = useState<Record<string, CountryData>>({});
   const [svgContent, setSvgContent] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('usage');
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,9 +75,21 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
     svgElement.setAttribute('height', 'auto');
     svgElement.style.maxHeight = '500px';
     svgElement.style.display = 'block';
+    svgElement.style.overflow = 'visible';
 
     // Get all country paths
     const paths = svgElement.querySelectorAll('path[id]');
+
+    // Mouse move handler for tooltip positioning
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      setMousePos({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+    };
+
+    container.addEventListener('mousemove', handleMouseMove);
 
     paths.forEach((path) => {
       const countryCode = path.getAttribute('id');
@@ -104,6 +117,7 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
     });
 
     return () => {
+      container.removeEventListener('mousemove', handleMouseMove);
       paths.forEach((path) => {
         const newPath = path.cloneNode(true);
         path.parentNode?.replaceChild(newPath, path);
@@ -343,7 +357,7 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
   };
 
   return (
-    <div className="relative w-full overflow-hidden">
+    <div className="relative w-full">
       {/* Tabs */}
       {showTabs && (
         <div className="mb-6 border-b border-gray-200">
@@ -383,16 +397,23 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
       )}
 
       {/* Map Container */}
-      <div className="relative overflow-visible">
+      <div className="relative w-full" style={{ maxHeight: '500px', overflow: 'hidden' }}>
         <div
           ref={containerRef}
-          className="w-full overflow-visible"
+          className="w-full"
           dangerouslySetInnerHTML={{ __html: svgContent }}
         />
 
         {/* Enhanced Tooltip */}
         {hoveredCountry && (
-          <div className="fixed top-20 left-8 bg-white px-4 py-3 rounded-lg shadow-xl border border-gray-200 pointer-events-none z-50 max-w-xs">
+          <div
+            className="absolute bg-white px-4 py-3 rounded-lg shadow-xl border border-gray-200 pointer-events-none z-50 max-w-xs"
+            style={{
+              left: `${mousePos.x + 15}px`,
+              top: `${mousePos.y - 10}px`,
+              transform: mousePos.x > 600 ? 'translateX(-100%) translateX(-20px)' : 'none'
+            }}
+          >
             {(() => {
               const info = getCountryInfo(hoveredCountry);
 
