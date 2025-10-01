@@ -10,18 +10,39 @@ export async function generateStaticParams() {
     const dataPath = path.join(process.cwd(), 'public', 'data', 'countries.json');
     const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
 
-    // Generate pages for all countries
-    return data.map((country: any) => ({
+    // Generate pages for all countries from data
+    const countryCodes = data.map((country: any) => ({
       code: country.geo_id.toLowerCase(),
     }));
+
+    // Also include all countries from the world map
+    const mapCountries = [
+      'us', 'ca', 'mx', 'br', 'ar',  // Americas
+      'gb', 'fr', 'de', 'es', 'it',  // Europe
+      'eg', 'za', 'ng',              // Africa
+      'sa', 'ae',                    // Middle East
+      'cn', 'in', 'jp', 'kr', 'id', 'th', 'vn', 'sg',  // Asia
+      'au', 'nz'                     // Oceania
+    ];
+
+    // Merge and deduplicate
+    const allCodes = new Set([
+      ...countryCodes.map((c: any) => c.code),
+      ...mapCountries
+    ]);
+
+    return Array.from(allCodes).map(code => ({ code }));
   } catch (error) {
     console.error('Error reading countries data:', error);
-    // Fallback to popular countries
-    const popularCountries = [
-      'us', 'gb', 'ca', 'au', 'de', 'fr', 'jp', 'sg', 'il', 'nz',
-      'kr', 'nl', 'se', 'ch', 'dk', 'fi', 'no', 'ie', 'be', 'at'
+    // Fallback to comprehensive list including map countries
+    const fallbackCountries = [
+      'us', 'ca', 'mx', 'br', 'ar',
+      'gb', 'fr', 'de', 'es', 'it',
+      'eg', 'za', 'ng', 'sa', 'ae',
+      'cn', 'in', 'jp', 'kr', 'id', 'th', 'vn', 'sg',
+      'au', 'nz'
     ];
-    return popularCountries.map((code) => ({ code }));
+    return fallbackCountries.map((code) => ({ code }));
   }
 }
 
