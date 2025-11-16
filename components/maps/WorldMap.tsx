@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
+import { useCountries } from '@/lib/hooks';
 
 interface CountryData {
   geo_id: string;
@@ -11,18 +13,23 @@ interface CountryData {
     usage_pct: number;
     usage_tier?: number;
   };
-  collaboration: Array<{
+  collaboration?: Array<{
     mode: string;
+    category?: string;
     metrics: {
       collaboration_count: number;
       collaboration_pct: number;
+      collaboration_pct_index?: number;
     };
   }>;
-  tasks: Array<{
+  tasks?: Array<{
     task: string;
+    soc_major_group?: string;
+    soc_major_group_title?: string;
     metrics: {
       onet_task_count: number;
       onet_task_pct: number;
+      onet_task_pct_index?: number;
     };
   }>;
 }
@@ -43,24 +50,35 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Load country data from JSON
-    fetch('/data/countries.json')
-      .then((res) => res.json())
-      .then((countries: CountryData[]) => {
-        const dataMap: Record<string, CountryData> = {};
-        countries.forEach((country) => {
-          dataMap[country.geo_id] = country;
-        });
-        setCountryData(dataMap);
-      })
-      .catch((err) => console.error('Failed to load country data:', err));
+  // Use SWR hook for countries data (cached and shared across components)
+  const { countries } = useCountries();
 
-    // Load SVG
+  // Transform countries array to map once data is loaded
+  useEffect(() => {
+    if (countries) {
+      const dataMap: Record<string, CountryData> = {};
+      countries.forEach((country) => {
+        dataMap[country.geo_id] = country;
+      });
+      setCountryData(dataMap);
+    }
+  }, [countries]);
+
+  useEffect(() => {
+    // Load SVG and sanitize to prevent XSS attacks
     fetch('/maps/world.svg')
       .then((res) => res.text())
-      .then((svg) => setSvgContent(svg))
-      .catch((err) => console.error('Failed to load SVG:', err));
+      .then((svg) => {
+        // Sanitize SVG to remove any potentially malicious scripts
+        const sanitized = DOMPurify.sanitize(svg, {
+          USE_PROFILES: { svg: true, svgFilters: true },
+          ADD_TAGS: ['svg', 'path', 'g', 'defs', 'clipPath'],
+        });
+        setSvgContent(sanitized);
+      })
+      .catch(() => {
+        // Failed to load SVG - map will not render
+      });
   }, []);
 
   useEffect(() => {
@@ -91,6 +109,18 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
 
     container.addEventListener('mousemove', handleMouseMove);
 
+    // Store event handlers for proper cleanup
+    const pathHandlers = new Map<Element, {
+      mouseenter: () => void;
+      mouseleave: () => void;
+      click: () => void;
+      keydown: (e: Event) => void;
+      focus: () => void;
+      blur: () => void;
+      mouseenterOpacity: (this: SVGPathElement) => void;
+      mouseleaveOpacity: (this: SVGPathElement) => void;
+    }>();
+
     paths.forEach((path) => {
       const countryCode = path.getAttribute('id');
       if (!countryCode) return;
@@ -102,27 +132,73 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
       path.setAttribute('stroke-width', '0.3');
       path.setAttribute('cursor', 'pointer');
 
-      // Add hover and click handlers
-      path.addEventListener('mouseenter', () => setHoveredCountry(countryCode));
-      path.addEventListener('mouseleave', () => setHoveredCountry(null));
-      path.addEventListener('click', () => handleCountryClick(countryCode));
+      // Make keyboard accessible
+      path.setAttribute('tabindex', '0');
+      path.setAttribute('role', 'button');
+      path.setAttribute('aria-label', `View details for ${countryCode}`);
 
-      // Add hover effect
-      path.addEventListener('mouseenter', function() {
+      // Create handler functions
+      const handleMouseEnter = () => setHoveredCountry(countryCode);
+      const handleMouseLeave = () => setHoveredCountry(null);
+      const handleClick = () => handleCountryClick(countryCode);
+      const handleKeyDown = (e: Event) => {
+        const keyEvent = e as unknown as KeyboardEvent;
+        if (keyEvent.key === 'Enter' || keyEvent.key === ' ') {
+          keyEvent.preventDefault();
+          handleCountryClick(countryCode);
+        }
+      };
+      const handleFocus = () => setHoveredCountry(countryCode);
+      const handleBlur = () => setHoveredCountry(null);
+      const handleMouseEnterOpacity = function(this: SVGPathElement) {
         this.setAttribute('opacity', '0.8');
-      });
-      path.addEventListener('mouseleave', function() {
+      };
+      const handleMouseLeaveOpacity = function(this: SVGPathElement) {
         this.setAttribute('opacity', '1');
+      };
+
+      // Store handlers for cleanup
+      pathHandlers.set(path, {
+        mouseenter: handleMouseEnter,
+        mouseleave: handleMouseLeave,
+        click: handleClick,
+        keydown: handleKeyDown,
+        focus: handleFocus,
+        blur: handleBlur,
+        mouseenterOpacity: handleMouseEnterOpacity,
+        mouseleaveOpacity: handleMouseLeaveOpacity,
       });
+
+      // Add event listeners
+      path.addEventListener('mouseenter', handleMouseEnter);
+      path.addEventListener('mouseleave', handleMouseLeave);
+      path.addEventListener('click', handleClick);
+      path.addEventListener('keydown', handleKeyDown);
+      path.addEventListener('focus', handleFocus);
+      path.addEventListener('blur', handleBlur);
+      path.addEventListener('mouseenter', handleMouseEnterOpacity);
+      path.addEventListener('mouseleave', handleMouseLeaveOpacity);
     });
 
+    // Proper cleanup function
     return () => {
       container.removeEventListener('mousemove', handleMouseMove);
-      paths.forEach((path) => {
-        const newPath = path.cloneNode(true);
-        path.parentNode?.replaceChild(newPath, path);
+
+      // Remove all event listeners from paths
+      pathHandlers.forEach((handlers, path) => {
+        path.removeEventListener('mouseenter', handlers.mouseenter);
+        path.removeEventListener('mouseleave', handlers.mouseleave);
+        path.removeEventListener('click', handlers.click);
+        path.removeEventListener('keydown', handlers.keydown);
+        path.removeEventListener('focus', handlers.focus);
+        path.removeEventListener('blur', handlers.blur);
+        path.removeEventListener('mouseenter', handlers.mouseenterOpacity);
+        path.removeEventListener('mouseleave', handlers.mouseleaveOpacity);
       });
+
+      pathHandlers.clear();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [svgContent, countryData, viewMode]);
 
   // Task categories mapping
@@ -286,25 +362,25 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
   const renderLegend = () => {
     if (viewMode === 'usage') {
       return (
-        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600">
+        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400" role="img" aria-label="Usage tier legend">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#117763' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#117763' }} aria-hidden="true"></div>
             <span>Leading</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#4DCAB6' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#4DCAB6' }} aria-hidden="true"></div>
             <span>Upper Middle</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#80D9CB' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#80D9CB' }} aria-hidden="true"></div>
             <span>Lower Middle</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#B3E8E0' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#B3E8E0' }} aria-hidden="true"></div>
             <span>Emerging</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#E6F7F5' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#E6F7F5' }} aria-hidden="true"></div>
             <span>Minimal</span>
           </div>
         </div>
@@ -313,13 +389,13 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
 
     if (viewMode === 'collaboration') {
       return (
-        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600">
+        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400" role="img" aria-label="Collaboration mode legend">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#A8C5A0' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#A8C5A0' }} aria-hidden="true"></div>
             <span>Augmentation</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#B4A7D6' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#B4A7D6' }} aria-hidden="true"></div>
             <span>Automation</span>
           </div>
         </div>
@@ -328,25 +404,25 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
 
     if (viewMode === 'industries') {
       return (
-        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600 flex-wrap">
+        <div className="mt-4 flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400 flex-wrap" role="img" aria-label="Industry category legend">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#D4C5A0' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#D4C5A0' }} aria-hidden="true"></div>
             <span>Computer and mathematical</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F98D7F' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#F98D7F' }} aria-hidden="true"></div>
             <span>Arts, design, entertainment</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#6B8DD6' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#6B8DD6' }} aria-hidden="true"></div>
             <span>Educational instruction</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#9CA3AF' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#9CA3AF' }} aria-hidden="true"></div>
             <span>Office and administrative</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#96C1A2' }}></div>
+            <div className="w-4 h-4 rounded" style={{ backgroundColor: '#96C1A2' }} aria-hidden="true"></div>
             <span>Business and management</span>
           </div>
         </div>
@@ -360,34 +436,43 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
     <div className="relative w-full">
       {/* Tabs */}
       {showTabs && (
-        <div className="mb-6 border-b border-gray-200">
+        <div className="mb-6 border-b border-gray-200 dark:border-gray-700" role="tablist" aria-label="Map view modes">
           <div className="flex gap-8">
             <button
               onClick={() => setViewMode('usage')}
+              role="tab"
+              aria-selected={viewMode === 'usage'}
+              aria-controls="world-map-view"
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                 viewMode === 'usage'
-                  ? 'border-teal-600 text-teal-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-teal-600 dark:border-teal-400 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
               Usage Index
             </button>
             <button
               onClick={() => setViewMode('collaboration')}
+              role="tab"
+              aria-selected={viewMode === 'collaboration'}
+              aria-controls="world-map-view"
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                 viewMode === 'collaboration'
-                  ? 'border-teal-600 text-teal-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-teal-600 dark:border-teal-400 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
               Augmentation vs. automation
             </button>
             <button
               onClick={() => setViewMode('industries')}
+              role="tab"
+              aria-selected={viewMode === 'industries'}
+              aria-controls="world-map-view"
               className={`pb-3 px-1 text-sm font-medium border-b-2 transition-colors ${
                 viewMode === 'industries'
-                  ? 'border-teal-600 text-teal-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-teal-600 dark:border-teal-400 text-teal-600 dark:text-teal-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
               }`}
             >
               Top industries
@@ -397,7 +482,13 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
       )}
 
       {/* Map Container */}
-      <div className="relative w-full" style={{ maxHeight: '500px', overflow: 'hidden' }}>
+      <div
+        id="world-map-view"
+        role="tabpanel"
+        aria-label={`World map showing ${viewMode === 'usage' ? 'usage index' : viewMode === 'collaboration' ? 'collaboration modes' : 'industry distribution'}`}
+        className="relative w-full"
+        style={{ maxHeight: '500px', overflow: 'hidden' }}
+      >
         <div
           ref={containerRef}
           className="w-full"
@@ -407,7 +498,9 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
         {/* Enhanced Tooltip */}
         {hoveredCountry && (
           <div
-            className="absolute bg-white px-4 py-3 rounded-lg shadow-xl border border-gray-200 pointer-events-none z-50 max-w-xs"
+            role="tooltip"
+            aria-live="polite"
+            className="absolute bg-white dark:bg-gray-800 px-4 py-3 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 pointer-events-none z-50 max-w-xs"
             style={{
               left: `${mousePos.x + 15}px`,
               top: `${mousePos.y - 10}px`,
@@ -419,7 +512,7 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
 
               return (
                 <div className="space-y-2">
-                  <div className="font-semibold text-gray-900 border-b border-gray-100 pb-2">
+                  <div className="font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700 pb-2">
                     {hoveredCountry}
                   </div>
                   {info && (
@@ -427,16 +520,16 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
                       {/* Usage Index View */}
                       {viewMode === 'usage' && (
                         <>
-                          <div className="text-xs text-gray-600">
-                            <span className="text-gray-500">Tier:</span>{' '}
-                            <span className="font-medium text-teal-700">{info.tier}</span>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            <span className="text-gray-500 dark:text-gray-400">Tier:</span>{' '}
+                            <span className="font-medium text-teal-700 dark:text-teal-400">{info.tier}</span>
                           </div>
-                          <div className="text-xs text-gray-600">
-                            <span className="text-gray-500">Usage:</span>{' '}
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            <span className="text-gray-500 dark:text-gray-400">Usage:</span>{' '}
                             <span className="font-medium">{info.usageCount}</span>
                           </div>
-                          <div className="text-xs text-gray-600">
-                            <span className="text-gray-500">Percentage:</span>{' '}
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            <span className="text-gray-500 dark:text-gray-400">Percentage:</span>{' '}
                             <span className="font-medium">{info.usagePct}%</span>
                           </div>
                         </>
@@ -445,22 +538,22 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
                       {/* Collaboration View */}
                       {viewMode === 'collaboration' && (
                         <>
-                          <div className="text-xs text-gray-600">
-                            <span className="text-gray-500">Dominant:</span>{' '}
-                            <span className="font-medium text-purple-700">{info.dominant}</span>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            <span className="text-gray-500 dark:text-gray-400">Dominant:</span>{' '}
+                            <span className="font-medium text-purple-700 dark:text-purple-400">{info.dominant}</span>
                           </div>
                           <div className="pt-1 space-y-1">
-                            <div className="text-xs text-gray-600">
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
                               <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#A8C5A0' }}></div>
-                                <span className="text-gray-500">Augmentation:</span>
+                                <span className="text-gray-500 dark:text-gray-400">Augmentation:</span>
                                 <span className="font-medium">{info.augmentation}%</span>
                               </div>
                             </div>
-                            <div className="text-xs text-gray-600">
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
                               <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#B4A7D6' }}></div>
-                                <span className="text-gray-500">Automation:</span>
+                                <span className="text-gray-500 dark:text-gray-400">Automation:</span>
                                 <span className="font-medium">{info.automation}%</span>
                               </div>
                             </div>
@@ -471,26 +564,26 @@ export default function WorldMap({ data, showTabs = true }: WorldMapProps) {
                       {/* Industries View */}
                       {viewMode === 'industries' && (
                         <>
-                          <div className="text-xs text-gray-600">
-                            <span className="text-gray-500">Top Industry:</span>{' '}
-                            <span className="font-medium text-blue-700">{info.topIndustry}</span>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            <span className="text-gray-500 dark:text-gray-400">Top Industry:</span>{' '}
+                            <span className="font-medium text-blue-700 dark:text-blue-400">{info.topIndustry}</span>
                           </div>
                           {info.taskCount && (
-                            <div className="text-xs text-gray-600">
-                              <span className="text-gray-500">Tasks:</span>{' '}
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              <span className="text-gray-500 dark:text-gray-400">Tasks:</span>{' '}
                               <span className="font-medium">{info.taskCount}</span>
                             </div>
                           )}
                         </>
                       )}
 
-                      <div className="text-xs text-gray-400 italic pt-1 border-t border-gray-100 mt-2">
+                      <div className="text-xs text-gray-400 dark:text-gray-500 italic pt-1 border-t border-gray-100 dark:border-gray-700 mt-2">
                         Click to view details
                       </div>
                     </>
                   )}
                   {!info && (
-                    <div className="text-xs text-gray-500 italic">No data available</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 italic">No data available</div>
                   )}
                 </div>
               );

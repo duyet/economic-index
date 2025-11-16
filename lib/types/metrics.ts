@@ -4,6 +4,7 @@ export interface UsageMetrics {
   usage_per_capita?: number;
   usage_per_capita_index?: number; // AUI - Anthropic AI Usage Index
   usage_tier?: number; // 0-4 tier
+  usage_rank?: number; // Rank by usage
 }
 
 export interface ContentMetrics {

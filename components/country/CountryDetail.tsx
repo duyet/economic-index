@@ -1,34 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MetricCard } from '@/components/ui/MetricCard';
 import MainLayout from '@/components/layout/MainLayout';
 import { formatIndex, formatNumber, formatPercent } from '@/lib/utils/formatters';
+import { useCountry } from '@/lib/hooks';
 
 interface CountryDetailProps {
   code: string;
 }
 
 export function CountryDetail({ code }: CountryDetailProps) {
-  const [country, setCountry] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { country, isLoading, notFound } = useCountry(code);
 
-  useEffect(() => {
-    fetch('/data/countries.json')
-      .then((res) => res.json())
-      .then((data) => {
-        const found = data.find((c: any) => c.geo_id === code.toUpperCase());
-        setCountry(found);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error loading country:', error);
-        setLoading(false);
-      });
-  }, [code]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <MainLayout>
         <div className="p-8">Loading...</div>
@@ -36,7 +21,7 @@ export function CountryDetail({ code }: CountryDetailProps) {
     );
   }
 
-  if (!country) {
+  if (notFound || !country) {
     return (
       <MainLayout>
         <div className="p-8">
@@ -56,14 +41,14 @@ export function CountryDetail({ code }: CountryDetailProps) {
 
   // Get top tasks
   const topTasks = (country.tasks || [])
-    .filter((t: any) => t.task !== 'not_classified' && t.task !== 'none')
-    .sort((a: any, b: any) => (b.metrics.onet_task_pct || 0) - (a.metrics.onet_task_pct || 0))
+    .filter((t) => t.task !== 'not_classified' && t.task !== 'none')
+    .sort((a, b) => (b.metrics.onet_task_pct || 0) - (a.metrics.onet_task_pct || 0))
     .slice(0, 10);
 
   // Get collaboration data
   const collaboration = (country.collaboration || [])
-    .filter((c: any) => c.mode !== 'not_classified' && c.mode !== 'none')
-    .sort((a: any, b: any) => (b.metrics.collaboration_pct || 0) - (a.metrics.collaboration_pct || 0));
+    .filter((c) => c.mode !== 'not_classified' && c.mode !== 'none')
+    .sort((a, b) => (b.metrics.collaboration_pct || 0) - (a.metrics.collaboration_pct || 0));
 
   return (
     <MainLayout>
@@ -110,7 +95,7 @@ export function CountryDetail({ code }: CountryDetailProps) {
           <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
             <h2 className="text-xl font-serif mb-4">Collaboration Modes</h2>
             <div className="space-y-3">
-              {collaboration.map((c: any) => (
+              {collaboration.map((c) => (
                 <div key={c.mode} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div
@@ -142,7 +127,7 @@ export function CountryDetail({ code }: CountryDetailProps) {
         <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h2 className="text-xl font-serif mb-4">Most Frequent Topics in {country.geo_id}</h2>
           <div className="space-y-2">
-            {topTasks.map((task: any, index: number) => (
+            {topTasks.map((task, index: number) => (
               <div
                 key={index}
                 className="flex items-start justify-between py-2 border-b border-gray-100 last:border-0"

@@ -1,33 +1,26 @@
+import fs from 'fs';
+import path from 'path';
 import type { GeographyData, GlobalSummary } from '../types';
 
+// Helper to load data from public directory during build
+function loadJSONFile(filename: string) {
+  const filePath = path.join(process.cwd(), 'public', 'data', filename);
+  const fileContent = fs.readFileSync(filePath, 'utf-8');
+  return JSON.parse(fileContent);
+}
+
 export async function loadCountries(): Promise<any[]> {
-  const response = await fetch('/data/countries.json');
-  if (!response.ok) {
-    throw new Error('Failed to load countries data');
-  }
-  return response.json();
+  return loadJSONFile('countries.json');
 }
 
 export async function loadStates(): Promise<any[]> {
-  const response = await fetch('/data/states.json');
-  if (!response.ok) {
-    throw new Error('Failed to load states data');
-  }
-  return response.json();
+  return loadJSONFile('states.json');
 }
 
 export async function loadGlobal(): Promise<any> {
-  const response = await fetch('/data/global.json');
-  if (!response.ok) {
-    throw new Error('Failed to load global data');
-  }
-  return response.json();
+  return loadJSONFile('global.json');
 }
 
 export async function loadMetadata(): Promise<GlobalSummary> {
-  const response = await fetch('/data/metadata.json');
-  if (!response.ok) {
-    throw new Error('Failed to load metadata');
-  }
-  return response.json();
+  return loadJSONFile('metadata.json');
 }

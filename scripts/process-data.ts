@@ -13,12 +13,47 @@ if (!fs.existsSync(OUTPUT_DIR)) {
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 }
 
+interface GeoMetrics {
+  [key: string]: number | string;
+}
+
+interface Task {
+  task: string;
+  metrics: {
+    [key: string]: number;
+  };
+}
+
+interface Request {
+  cluster_name: string;
+  metrics: {
+    [key: string]: number;
+  };
+  level: number;
+}
+
+interface Collaboration {
+  mode: string;
+  metrics: {
+    [key: string]: number;
+  };
+}
+
+interface GeoData {
+  geo_id: string;
+  geography: string;
+  metrics: GeoMetrics;
+  tasks: Task[];
+  requests: Request[];
+  collaboration: Collaboration[];
+}
+
 interface ProcessedData {
-  countries: Map<string, any>;
-  states: Map<string, any>;
-  global: any;
-  tasks: Map<string, any>;
-  requests: Map<string, any>;
+  countries: Map<string, GeoData>;
+  states: Map<string, GeoData>;
+  global: GeoData;
+  tasks: Map<string, Task>;
+  requests: Map<string, Request>;
 }
 
 async function parseCSV(filePath: string): Promise<RawDataRow[]> {
@@ -51,9 +86,16 @@ async function processClaudeAIData() {
   console.log(`✅ Loaded ${data.length} rows from Claude AI data`);
 
   // Initialize data structures
-  const countries = new Map<string, any>();
-  const states = new Map<string, any>();
-  let globalData: any = {};
+  const countries = new Map<string, GeoData>();
+  const states = new Map<string, GeoData>();
+  let globalData: GeoData = {
+    geo_id: '',
+    geography: 'global',
+    metrics: {},
+    tasks: [],
+    requests: [],
+    collaboration: [],
+  };
 
   // Group data by geography
   for (const row of data) {
@@ -63,7 +105,7 @@ async function processClaudeAIData() {
     if (geo_id === 'not_classified') continue;
 
     // Initialize geography entry if needed
-    let geoData: any;
+    let geoData: GeoData | undefined;
     if (geography === 'country') {
       if (!countries.has(geo_id)) {
         countries.set(geo_id, {
@@ -111,7 +153,7 @@ async function processClaudeAIData() {
       // Task data - skip not_classified
       if (cluster_name === 'not_classified') continue;
       const taskKey = cluster_name;
-      let task = geoData.tasks.find((t: any) => t.task === taskKey);
+      let task = geoData.tasks.find((t) => t.task === taskKey);
       if (!task) {
         task = { task: taskKey, metrics: {} };
         geoData.tasks.push(task);
@@ -121,7 +163,7 @@ async function processClaudeAIData() {
       // Request data - skip not_classified
       if (cluster_name === 'not_classified') continue;
       const requestKey = cluster_name;
-      let request = geoData.requests.find((r: any) => r.cluster_name === requestKey);
+      let request = geoData.requests.find((r) => r.cluster_name === requestKey);
       if (!request) {
         request = { cluster_name: requestKey, metrics: {}, level: row.level };
         geoData.requests.push(request);
@@ -131,7 +173,7 @@ async function processClaudeAIData() {
       // Collaboration data - skip not_classified
       if (cluster_name === 'not_classified') continue;
       const mode = cluster_name;
-      let collab = geoData.collaboration.find((c: any) => c.mode === mode);
+      let collab = geoData.collaboration.find((c) => c.mode === mode);
       if (!collab) {
         collab = { mode, metrics: {} };
         geoData.collaboration.push(collab);
@@ -146,7 +188,7 @@ async function processClaudeAIData() {
   return { countries, states, global: globalData };
 }
 
-async function processAPIData() {
+async function processAPIData(): Promise<GeoData> {
   console.log('📊 Processing 1P API data...');
 
   const apiFile = path.join(DATA_DIR, 'aei_raw_1p_api_2025-08-04_to_2025-08-11.csv');
@@ -154,10 +196,9 @@ async function processAPIData() {
 
   console.log(`✅ Loaded ${data.length} rows from 1P API data`);
 
-  const apiData: any = {
+  const apiData: GeoData = {
     geo_id: 'GLOBAL',
     geography: 'global',
-    platform: '1P API',
     metrics: {},
     tasks: [],
     requests: [],
@@ -171,7 +212,7 @@ async function processAPIData() {
       // Skip not_classified
       if (cluster_name === 'not_classified') continue;
       const taskKey = cluster_name;
-      let task = apiData.tasks.find((t: any) => t.task === taskKey);
+      let task = apiData.tasks.find((t) => t.task === taskKey);
       if (!task) {
         task = { task: taskKey, metrics: {} };
         apiData.tasks.push(task);
@@ -181,7 +222,7 @@ async function processAPIData() {
       // Skip not_classified
       if (cluster_name === 'not_classified') continue;
       const requestKey = cluster_name;
-      let request = apiData.requests.find((r: any) => r.cluster_name === requestKey);
+      let request = apiData.requests.find((r) => r.cluster_name === requestKey);
       if (!request) {
         request = { cluster_name: requestKey, metrics: {}, level: row.level };
         apiData.requests.push(request);
@@ -191,7 +232,7 @@ async function processAPIData() {
       // Skip not_classified
       if (cluster_name === 'not_classified') continue;
       const mode = cluster_name;
-      let collab = apiData.collaboration.find((c: any) => c.mode === mode);
+      let collab = apiData.collaboration.find((c) => c.mode === mode);
       if (!collab) {
         collab = { mode, metrics: {} };
         apiData.collaboration.push(collab);
@@ -203,7 +244,7 @@ async function processAPIData() {
   return apiData;
 }
 
-function calculateTiersAndRanks(geoMap: Map<string, any>) {
+function calculateTiersAndRanks(geoMap: Map<string, GeoData>): void {
   console.log('📊 Calculating usage tiers and ranks...');
 
   const geoArray = Array.from(geoMap.values());
@@ -240,7 +281,23 @@ function calculateTiersAndRanks(geoMap: Map<string, any>) {
   console.log(`✅ Calculated tiers and ranks for ${geoArray.length} geographies`);
 }
 
-function aggregateTasksByOccupation(globalData: any): any[] {
+interface TaskOccupationMapping {
+  task: string;
+  soc_code: string;
+  occupation_title: string;
+  soc_major_group: string;
+}
+
+interface Occupation {
+  soc_code: string;
+  occupation_title: string;
+  soc_major_group: string;
+  tasks: Task[];
+  total_usage_count: number;
+  total_usage_pct: number;
+}
+
+function aggregateTasksByOccupation(globalData: GeoData): Occupation[] {
   console.log('📊 Aggregating tasks by occupation...');
 
   // Load task-occupation mapping
@@ -250,11 +307,11 @@ function aggregateTasksByOccupation(globalData: any): any[] {
     return [];
   }
 
-  const mapping: any[] = JSON.parse(fs.readFileSync(mappingFile, 'utf-8'));
+  const mapping: TaskOccupationMapping[] = JSON.parse(fs.readFileSync(mappingFile, 'utf-8'));
   const taskMap = new Map(mapping.map(m => [m.task, m]));
 
   // Group tasks by occupation
-  const occupationMap = new Map<string, any>();
+  const occupationMap = new Map<string, Occupation>();
 
   for (const task of globalData.tasks) {
     const normalizedTask = task.task.toLowerCase().trim();
@@ -345,7 +402,19 @@ async function main() {
     }
 
     // Write summary
-    const summary = {
+    interface Summary {
+      generated: string;
+      dateRange: {
+        start: string;
+        end: string;
+      };
+      counts: {
+        countries: number;
+        states: number;
+      };
+    }
+
+    const summary: Summary = {
       generated: new Date().toISOString(),
       dateRange: {
         start: '2025-08-04',

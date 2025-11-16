@@ -83,7 +83,7 @@ export function CollaborationChart({
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
-        <div className="flex gap-4 text-sm mt-2">
+        <div className="flex gap-4 text-sm mt-2" role="status" aria-label="Collaboration mode summary">
           <div>
             <span className="font-medium">Automation:</span>{' '}
             <span className="text-teal-600">{automation.toFixed(1)}%</span>
@@ -95,12 +95,12 @@ export function CollaborationChart({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-4" role="list" aria-label="Collaboration modes breakdown">
           {data
             .filter((item) => item.mode !== 'none' && item.mode !== 'not_classified')
             .sort((a, b) => b.pct - a.pct)
             .map((item) => (
-              <div key={item.mode} className="flex items-center justify-between">
+              <div key={item.mode} className="flex items-center justify-between" role="listitem">
                 <div className="flex items-center gap-3">
                   <div
                     className="w-3 h-3 rounded-full"
@@ -109,11 +109,12 @@ export function CollaborationChart({
                         ? 'hsl(173, 58%, 39%)'
                         : 'hsl(120, 35%, 50%)',
                     }}
+                    aria-hidden="true"
                   />
                   <span className="capitalize text-sm">{item.mode}</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className="w-48 bg-gray-200 rounded-full h-2">
+                  <div className="w-48 bg-gray-200 rounded-full h-2" role="progressbar" aria-valuenow={item.pct || 0} aria-valuemin={0} aria-valuemax={100} aria-label={`${item.mode} percentage`}>
                     <div
                       className="h-2 rounded-full"
                       style={{
