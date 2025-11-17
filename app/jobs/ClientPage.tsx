@@ -143,22 +143,26 @@ export default function JobsPage() {
             return (
               <article
                 key={occIndex}
-                className="bg-white rounded-lg border border-gray-200 p-4 hover:border-gray-300 hover:shadow-md transition-all duration-150 cursor-pointer"
+                className="group relative bg-white rounded-xl border border-gray-100 p-5 shadow-soft hover:shadow-soft-lg hover:border-teal-200 hover:scale-[1.02] transition-all duration-300 ease-out cursor-pointer overflow-hidden"
                 role="listitem"
                 aria-label={`${occ.occupation_title}, ${formatPercent(occ.usage_pct || 0)} usage`}
                 style={{ height: `${CARD_HEIGHT}px` }}
               >
+                {/* Header */}
                 <div className="mb-3">
-                  <h3 className="font-medium text-[15px] text-gray-900 mb-1.5 line-clamp-2 min-h-[2.6rem] leading-[1.3]">
+                  <h3 className="font-semibold text-[15px] text-gray-900 mb-2 line-clamp-2 min-h-[2.6rem] leading-[1.3] group-hover:text-teal-700 transition-colors">
                     {occ.occupation_title}
                   </h3>
-                  <div className="text-xs text-gray-500">
-                    {SOC_MAJOR_GROUPS[occ.soc_major_group] || 'Other'}
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 group-hover:bg-teal-50 transition-colors">
+                    <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                    <span className="text-xs font-medium text-gray-600 group-hover:text-teal-700">
+                      {SOC_MAJOR_GROUPS[occ.soc_major_group] || 'Other'}
+                    </span>
                   </div>
                 </div>
 
                 {/* Task Waffle Chart */}
-                <div className="mb-3">
+                <div className="mb-3 bg-gray-50 rounded-lg p-2 group-hover:bg-teal-50/30 transition-colors">
                   <DataErrorBoundary componentName="Task Chart">
                     <TaskWaffleChart
                       tasks={(occ.tasks || []).map((t) => ({
@@ -173,9 +177,15 @@ export default function JobsPage() {
                 </div>
 
                 {/* Usage Percentage */}
-                <div className="text-xs text-gray-600">
-                  {formatPercent(occ.usage_pct || 0)} usage
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Usage</span>
+                  <span className="text-sm font-bold text-teal-600">
+                    {formatPercent(occ.usage_pct || 0)}
+                  </span>
                 </div>
+
+                {/* Hover indicator */}
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-teal-500 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-b-xl" />
               </article>
             );
           })}
@@ -187,7 +197,27 @@ export default function JobsPage() {
   if (isLoading) {
     return (
       <MainLayout>
-        <div>Loading...</div>
+        <div className="max-w-7xl">
+          <header className="mb-8">
+            <div className="h-12 w-64 bg-gray-200 rounded-lg animate-pulse mb-4" />
+            <div className="h-6 w-full max-w-3xl bg-gray-200 rounded animate-pulse" />
+          </header>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+            {[...Array(10)].map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-xl border border-gray-100 p-4 shadow-soft animate-scale-in"
+                style={{ animationDelay: `${i * 50}ms`, height: '240px' }}
+              >
+                <div className="space-y-3">
+                  <div className="h-12 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-32 bg-gray-100 rounded animate-pulse" />
+                  <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </MainLayout>
     );
   }
@@ -195,7 +225,17 @@ export default function JobsPage() {
   if (isError || !occupations) {
     return (
       <MainLayout>
-        <div>Error loading occupations data</div>
+        <div className="max-w-7xl">
+          <div className="text-center py-16">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-serif font-light text-gray-900 mb-2">Error loading occupations data</h2>
+            <p className="text-gray-600">Please try refreshing the page</p>
+          </div>
+        </div>
       </MainLayout>
     );
   }
@@ -239,29 +279,42 @@ export default function JobsPage() {
         </div>
 
         {/* Controls */}
-        <div className="space-y-4 mb-6" role="search" aria-label="Search and filter jobs">
+        <div className="space-y-5 mb-8" role="search" aria-label="Search and filter jobs">
           <div className="flex gap-4">
-            <div className="flex-1 relative">
+            <div className="flex-1 relative group">
               <label htmlFor="job-search" className="sr-only">Search for a job</label>
+              <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-teal-500 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
               <input
                 id="job-search"
                 type="text"
-                placeholder="Search for a job"
+                placeholder="Search for a job by title..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white"
+                className="w-full pl-12 pr-12 py-3 border border-gray-200 rounded-xl bg-white shadow-soft focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:shadow-glow-teal transition-all duration-300"
                 aria-label="Search for a job by title"
               />
-              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label="Clear search"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
             </div>
             <label htmlFor="sort-jobs" className="sr-only">Sort jobs</label>
             <select
               id="sort-jobs"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'usage' | 'name')}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white min-w-[200px]"
+              className="px-6 py-3 border border-gray-200 rounded-xl bg-white shadow-soft focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 focus:shadow-glow-teal transition-all duration-300 font-medium text-gray-700 min-w-[220px]"
               aria-label="Sort jobs by"
             >
               <option value="usage">Sort By: Usage Rank</option>
@@ -271,14 +324,14 @@ export default function JobsPage() {
 
           {/* Category Filter */}
           {categories.length > 0 && (
-            <div className="flex items-center gap-3 flex-wrap" role="group" aria-label="Filter by job category">
-              <span className="text-sm font-medium text-gray-700" id="category-label">Category:</span>
+            <div className="flex items-center gap-2.5 flex-wrap" role="group" aria-label="Filter by job category">
+              <span className="text-sm font-semibold text-gray-700 mr-1" id="category-label">Category:</span>
               <button
                 onClick={() => setCategoryFilter('all')}
-                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-300 ${
                   categoryFilter === 'all'
-                    ? 'bg-teal-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-glow-teal scale-105'
+                    : 'bg-white border border-gray-200 text-gray-700 hover:border-teal-300 hover:bg-teal-50 shadow-soft'
                 }`}
                 aria-pressed={categoryFilter === 'all'}
                 aria-label="Show all categories"
@@ -289,10 +342,10 @@ export default function JobsPage() {
                 <button
                   key={code}
                   onClick={() => setCategoryFilter(code)}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  className={`px-4 py-2 text-sm font-medium rounded-full transition-all duration-300 ${
                     categoryFilter === code
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-glow-teal scale-105'
+                      : 'bg-white border border-gray-200 text-gray-700 hover:border-teal-300 hover:bg-teal-50 shadow-soft'
                   }`}
                   aria-pressed={categoryFilter === code}
                   aria-label={`Filter by ${title}`}
@@ -303,7 +356,7 @@ export default function JobsPage() {
               {categoryFilter !== 'all' && !categories.slice(0, 6).find(([code]) => code === categoryFilter) && (
                 <button
                   onClick={() => setCategoryFilter('all')}
-                  className="px-2 py-1.5 text-sm text-teal-600 hover:text-teal-700"
+                  className="px-4 py-2 text-sm font-medium text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-full transition-colors"
                 >
                   Clear filter
                 </button>
@@ -313,14 +366,48 @@ export default function JobsPage() {
         </div>
 
         {/* Results Count */}
-        <div className="mb-6 text-sm text-gray-600 text-center" role="status" aria-live="polite">
-          {filteredOccupations.length} occupations
+        <div className="mb-6 text-sm text-gray-600 flex items-center justify-center gap-2" role="status" aria-live="polite">
+          <div className="w-2 h-2 rounded-full bg-teal-500" />
+          <span className="font-medium">
+            {filteredOccupations.length} {filteredOccupations.length === 1 ? 'occupation' : 'occupations'}
+          </span>
+          {(searchTerm || categoryFilter !== 'all') && (
+            <span className="text-gray-500">
+              found
+            </span>
+          )}
         </div>
 
         {/* Virtualized Occupations List */}
         {filteredOccupations.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            No occupations found matching your criteria
+          <div className="text-center py-16 animate-fade-in">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-6">
+              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-serif font-light text-gray-900 mb-2">No occupations found</h3>
+            <p className="text-gray-600 mb-6">
+              Try adjusting your search or filters
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-xl hover:bg-teal-700 shadow-soft hover:shadow-soft-lg transition-all duration-300 font-medium"
+                >
+                  Clear search
+                </button>
+              )}
+              {categoryFilter !== 'all' && (
+                <button
+                  onClick={() => setCategoryFilter('all')}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:border-teal-300 hover:bg-teal-50 shadow-soft transition-all duration-300 font-medium"
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div ref={containerRef} role="list" aria-label="Job occupations">
