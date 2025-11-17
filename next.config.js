@@ -57,7 +57,7 @@ const nextConfig = {
 
   // Production optimizations
   reactStrictMode: true,
-  swcMinify: true,
+  // Note: swcMinify is enabled by default in Next.js 15+
 
   // Configure TypeScript and ESLint checks
   typescript: {
