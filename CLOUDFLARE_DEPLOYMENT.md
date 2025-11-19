@@ -91,6 +91,16 @@ npm install
 npm run build
 ```
 
+**Error: "Error occurred prerendering page '/country/us'" (digest: 2188301499)**
+
+This was a critical SSG compatibility issue with SWR hooks attempting to fetch data during static generation.
+
+**Status:** ✅ **FIXED** (Commit: 1a7f056, 97c0f82)
+
+The fix pre-loads country data in the server component and passes it as initial data to client components, avoiding fetch() calls during SSG while maintaining SWR benefits after hydration.
+
+**Details:** See `CLOUDFLARE_BUILD_FIX.md` for comprehensive explanation.
+
 ### Build Warnings
 
 **Warning: "Specified headers will not automatically work with output: export"**
