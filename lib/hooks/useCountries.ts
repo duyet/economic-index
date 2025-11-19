@@ -45,6 +45,7 @@ export function useCountries() {
  * Hook to fetch a single country by code
  *
  * @param code - Country code (e.g., "US", "GB")
+ * @param initialData - Optional initial country data for SSG/SSR
  * @returns {object} SWR response with country data
  *
  * @example
@@ -59,7 +60,7 @@ export function useCountries() {
  * }
  * ```
  */
-export function useCountry(code: string) {
+export function useCountry(code: string, initialData?: GeographyRecord) {
   const { data: countries, error, isLoading } = useCountries();
 
   // Find the specific country from the cached list
@@ -67,12 +68,15 @@ export function useCountry(code: string) {
     (c) => c.geo_id.toLowerCase() === code.toLowerCase()
   );
 
+  // Use initialData if countries haven't loaded yet (important for SSG)
+  const finalCountry = country || initialData;
+
   return {
-    data: country,
-    country, // Alias for convenience
+    data: finalCountry,
+    country: finalCountry, // Alias for convenience
     error,
     isLoading,
     isError: !!error,
-    notFound: !isLoading && !country && !error,
+    notFound: !isLoading && !finalCountry && !error,
   };
 }

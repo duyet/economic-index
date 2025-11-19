@@ -5,13 +5,15 @@ import { MetricCard } from '@/components/ui/MetricCard';
 import MainLayout from '@/components/layout/MainLayout';
 import { formatIndex, formatNumber, formatPercent } from '@/lib/utils/formatters';
 import { useCountry } from '@/lib/hooks';
+import type { GeographyRecord } from '@/lib/types';
 
 interface CountryDetailProps {
   code: string;
+  initialData?: GeographyRecord;
 }
 
-export function CountryDetail({ code }: CountryDetailProps) {
-  const { country, isLoading, notFound } = useCountry(code);
+export function CountryDetail({ code, initialData }: CountryDetailProps) {
+  const { country, isLoading, notFound } = useCountry(code, initialData);
 
   if (isLoading) {
     return (

@@ -62,6 +62,14 @@ export async function generateMetadata({
   };
 }
 
-export default function CountryPage({ params }: { params: Promise<{ code: string }> }) {
-  return <ClientPage params={params} />;
+export default async function CountryPage({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
+  const countries = await loadCountries();
+
+  // Pre-load the country data for SSG
+  const country = countries.find(
+    (c) => c.geo_id.toLowerCase() === code.toLowerCase()
+  );
+
+  return <ClientPage params={params} initialCountry={country} />;
 }
