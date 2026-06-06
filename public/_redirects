@@ -1,0 +1,19 @@
+# Cloudflare Pages Redirects Configuration
+# https://developers.cloudflare.com/pages/configuration/redirects/
+
+# Redirect old URLs (if any future migrations needed)
+# /old-path /new-path 301
+
+# Handle trailing slashes (Next.js generates pages with trailing slashes)
+# This is already configured in next.config.js with trailingSlash: true
+
+# SPA Fallback - Serve 404.html for all non-existent routes
+# Next.js static export handles this automatically with its own 404 page
+# The 404 page will be served automatically by Cloudflare Pages
+
+# API fallback (if adding API routes in the future)
+# /api/* /404.html 404
+
+# Ensure proper 404 handling
+# This tells Cloudflare to serve the 404 page with a 404 status code
+/* /404.html 404

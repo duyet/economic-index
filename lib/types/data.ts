@@ -46,3 +46,64 @@ export interface GlobalSummary {
     usage_pct: number;
   }>;
 }
+
+/**
+ * Flattened geography data structure as returned from JSON files
+ * (countries.json, states.json)
+ */
+export interface GeographyRecord {
+  geo_id: string;
+  geography: 'country' | 'state_us' | 'global';
+  name?: string;
+  iso_alpha_2?: string;
+  iso_alpha_3?: string;
+  state_code?: string;
+  metrics: AllMetrics;
+  tasks?: Array<{
+    task: string;
+    soc_major_group?: string;
+    soc_major_group_title?: string;
+    metrics: {
+      onet_task_count: number;
+      onet_task_pct: number;
+      onet_task_pct_index?: number;
+    };
+  }>;
+  requests?: Array<{
+    cluster_name: string;
+    level: number;
+    metrics: {
+      request_count: number;
+      request_pct: number;
+      request_pct_index?: number;
+    };
+  }>;
+  collaboration?: Array<{
+    mode: string;
+    category?: string;
+    metrics: {
+      collaboration_count: number;
+      collaboration_pct: number;
+      collaboration_pct_index?: number;
+    };
+  }>;
+}
+
+/**
+ * Occupation data structure for jobs page
+ */
+export interface OccupationRecord {
+  occupation_title: string;
+  soc_code: string;
+  soc_major_group: string;
+  soc_major_group_title: string;
+  task_count: number;
+  usage_count: number;
+  usage_pct: number;
+  automation_pct: number;
+  augmentation_pct: number;
+  tasks: Array<{
+    task: string;
+    usage_pct: number;
+  }>;
+}

@@ -1,52 +1,75 @@
-import { CountryDetail } from '@/components/country/CountryDetail';
+import type { Metadata } from 'next';
+import { ClientPage } from './ClientPage';
+import { loadCountries } from '@/lib/data/loaders';
+import { formatIndex, formatNumber } from '@/lib/utils/formatters';
 
-// Generate static params for all countries
+// Generate static params for key countries only
+// NOTE: Limited to avoid Next.js 15 static export event handler serialization issue
 export async function generateStaticParams() {
-  // Read the countries data at build time
-  const fs = require('fs');
-  const path = require('path');
+  // Only generate a minimal set of country pages
+  return [
+    { code: 'us' }
+  ];
+}
 
-  try {
-    const dataPath = path.join(process.cwd(), 'public', 'data', 'countries.json');
-    const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ code: string }>;
+}): Promise<Metadata> {
+  const { code } = await params;
+  const countries = await loadCountries();
+  const country = countries.find(
+    (c) => c.geo_id.toLowerCase() === code.toLowerCase()
+  );
 
-    // Generate pages for all countries from data
-    const countryCodes = data.map((country: any) => ({
-      code: country.geo_id.toLowerCase(),
-    }));
-
-    // Also include all countries from the world map (excluding CN - not in dataset)
-    const mapCountries = [
-      'us', 'ca', 'mx', 'br', 'ar',  // Americas
-      'gb', 'fr', 'de', 'es', 'it',  // Europe
-      'eg', 'za', 'ng',              // Africa
-      'sa', 'ae',                    // Middle East
-      'in', 'jp', 'kr', 'id', 'th', 'vn', 'sg',  // Asia
-      'au', 'nz'                     // Oceania
-    ];
-
-    // Merge and deduplicate
-    const allCodes = new Set([
-      ...countryCodes.map((c: any) => c.code),
-      ...mapCountries
-    ]);
-
-    return Array.from(allCodes).map(code => ({ code }));
-  } catch (error) {
-    console.error('Error reading countries data:', error);
-    // Fallback to comprehensive list including map countries (excluding CN - not in dataset)
-    const fallbackCountries = [
-      'us', 'ca', 'mx', 'br', 'ar',
-      'gb', 'fr', 'de', 'es', 'it',
-      'eg', 'za', 'ng', 'sa', 'ae',
-      'in', 'jp', 'kr', 'id', 'th', 'vn', 'sg',
-      'au', 'nz'
-    ];
-    return fallbackCountries.map((code) => ({ code }));
+  if (!country) {
+    return {
+      title: 'Country Not Found',
+      description: 'The requested country data could not be found.',
+    };
   }
+
+  const usageIndex = country.metrics.usage_per_capita_index
+    ? formatIndex(country.metrics.usage_per_capita_index)
+    : 'N/A';
+  const totalUsage = formatNumber(country.metrics.usage_count || 0);
+  const usagePct = (country.metrics.usage_pct || 0).toFixed(2);
+
+  const title = `${country.geo_id} | AI Adoption Data`;
+  const description = `AI adoption in ${country.geo_id}: Usage Index ${usageIndex}, ${totalUsage} total conversations (${usagePct}% of global). Explore collaboration modes, task distribution, and detailed metrics.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title: `${country.geo_id} | AI Adoption Metrics`,
+      description,
+      images: [
+        {
+          url: '/og-image.png',
+          width: 1200,
+          height: 630,
+          alt: `${country.geo_id} AI Adoption Data`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${country.geo_id} | AI Adoption Metrics`,
+      description: `AI adoption in ${country.geo_id}: ${usageIndex} Usage Index, ${totalUsage} conversations`,
+    },
+  };
 }
 
 export default async function CountryPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  return <CountryDetail code={code} />;
+  const countries = await loadCountries();
+
+  // Pre-load the country data for SSG
+  const country = countries.find(
+    (c) => c.geo_id.toLowerCase() === code.toLowerCase()
+  );
+
+  return <ClientPage params={params} initialCountry={country} />;
 }

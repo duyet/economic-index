@@ -1,16 +1,33 @@
 #!/usr/bin/env tsx
 
+/**
+ * DEPRECATED: This script requires the xlsx package which has known security vulnerabilities.
+ *
+ * To use this script:
+ * 1. Convert onet_task_statements.xlsx to CSV format
+ * 2. Use papaparse (already installed) instead of xlsx
+ * 3. Or install xlsx as a devDependency temporarily if needed
+ *
+ * The script is not used in production builds and the required source file
+ * (onet_task_statements.xlsx) is not included in the repository.
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
-import * as XLSX from 'xlsx';
+// import * as XLSX from 'xlsx'; // REMOVED: Security vulnerability
 
 const DATA_DIR = path.join(process.cwd(), 'aei_v3_download');
 const OUTPUT_DIR = path.join(process.cwd(), 'public', 'data');
 
 async function generateOccupationMapping() {
+  console.error('⚠️  This script is deprecated and requires xlsx package.');
+  console.error('⚠️  Please convert onet_task_statements.xlsx to CSV and use papaparse instead.');
+  console.error('⚠️  See script comments for details.');
+  process.exit(1);
+
   console.log('📊 Generating occupation mapping from O*NET...');
 
-  const onetFile = path.join(DATA_DIR, 'onet_task_statements.xlsx');
+  const onetFile = path.join(DATA_DIR, 'onet_task_statements.csv');
 
   // Read Excel file
   const workbook = XLSX.readFile(onetFile);

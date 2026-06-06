@@ -1,6 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo } from 'react';
+import {
+  UnifiedWaffleChart,
+  createSquaresFromWeightedItems,
+  type WaffleSquare,
+} from './UnifiedWaffleChart';
 
 interface Task {
   task: string;
@@ -16,156 +21,144 @@ interface TaskWaffleChartProps {
   size?: number;
 }
 
-export function TaskWaffleChart({ tasks, size = 12 }: TaskWaffleChartProps) {
-  const [hoveredTask, setHoveredTask] = useState<Task | null>(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+/**
+ * Assign collaboration modes to tasks based on hash
+ * This ensures consistent mode assignment for the same task
+ */
+function getCollaborationMode(task: Task): string {
+  if (task.collaboration_mode) return task.collaboration_mode;
 
+  const hash = task.task.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const modes = ['directive', 'feedback_loop', 'task_iteration', 'validation', 'learning'];
+  return modes[hash % modes.length];
+}
+
+/**
+ * Get color for a collaboration mode
+ */
+function getSquareColor(mode: string): string {
+  switch (mode) {
+    case 'directive':
+    case 'feedback_loop':
+      return '#5A9770'; // Sage green for automation
+    case 'task_iteration':
+    case 'validation':
+    case 'learning':
+      return '#B8A3D6'; // Lavender for augmentation
+    default:
+      return '#E8E4DC'; // Beige for no data
+  }
+}
+
+/**
+ * Get human-readable name for a collaboration mode
+ */
+function getModeName(mode: string): string {
+  const names: Record<string, string> = {
+    directive: 'Directive',
+    feedback_loop: 'Feedback Loop',
+    task_iteration: 'Task Iteration',
+    validation: 'Validation',
+    learning: 'Learning',
+  };
+  return names[mode] || mode;
+}
+
+/**
+ * TaskWaffleChart - Task-level O*NET distribution visualization
+ *
+ * Displays individual tasks as a waffle chart, with each square representing
+ * a portion of task usage. Colors indicate collaboration modes (automation vs augmentation).
+ * This is a lightweight wrapper around UnifiedWaffleChart.
+ *
+ * @example
+ * <TaskWaffleChart
+ *   tasks={[
+ *     { task: 'analyzing data', metrics: { onet_task_count: 100, onet_task_pct: 45.2 } },
+ *     { task: 'writing code', metrics: { onet_task_count: 80, onet_task_pct: 35.8 } }
+ *   ]}
+ *   size={12}
+ * />
+ */
+export function TaskWaffleChart({ tasks, size = 12 }: TaskWaffleChartProps) {
   const totalSquares = size * size;
 
-  // Calculate total usage
-  const totalUsage = tasks.reduce((sum, t) => sum + (t.metrics.onet_task_pct || 0), 0);
+  // Calculate total usage for percentage calculations
+  const totalUsage = useMemo(
+    () => tasks.reduce((sum, t) => sum + (t.metrics.onet_task_pct || 0), 0),
+    [tasks]
+  );
 
-  // Assign squares to tasks based on their usage percentage
-  const taskSquares: (Task | null)[] = [];
-  let remainingSquares = totalSquares;
+  // Create squares from weighted task data
+  const squares = useMemo(
+    () =>
+      createSquaresFromWeightedItems(
+        tasks,
+        (task) => task.metrics.onet_task_pct,
+        (task) => getSquareColor(getCollaborationMode(task)),
+        totalSquares
+      ),
+    [tasks, totalSquares]
+  );
 
-  tasks.forEach((task, index) => {
-    const taskPercentage = (task.metrics.onet_task_pct / totalUsage) * 100;
-    let squaresForTask = Math.round((taskPercentage / 100) * totalSquares);
+  // Generate accessible description
+  const accessibleDescription = useMemo(() => {
+    const automationTasks = tasks.filter((t) => {
+      const mode = getCollaborationMode(t);
+      return mode === 'directive' || mode === 'feedback_loop';
+    });
+    const augmentationTasks = tasks.filter((t) => {
+      const mode = getCollaborationMode(t);
+      return mode === 'task_iteration' || mode === 'validation' || mode === 'learning';
+    });
 
-    // Ensure we don't exceed total squares
-    if (index === tasks.length - 1) {
-      squaresForTask = remainingSquares;
-    } else {
-      squaresForTask = Math.min(squaresForTask, remainingSquares);
-    }
+    const automationPct = (
+      (automationTasks.reduce((sum, t) => sum + t.metrics.onet_task_pct, 0) / totalUsage) *
+      100
+    ).toFixed(0);
+    const augmentationPct = (
+      (augmentationTasks.reduce((sum, t) => sum + t.metrics.onet_task_pct, 0) / totalUsage) *
+      100
+    ).toFixed(0);
 
-    remainingSquares -= squaresForTask;
+    return `Task distribution chart: ${automationPct}% automated tasks, ${augmentationPct}% augmented tasks`;
+  }, [tasks, totalUsage]);
 
-    for (let i = 0; i < squaresForTask; i++) {
-      taskSquares.push(task);
-    }
-  });
+  // Render tooltip for individual task
+  const renderTooltip = (square: WaffleSquare<Task>) => {
+    if (!square.data) return null;
 
-  // Fill remaining squares with null
-  while (taskSquares.length < totalSquares) {
-    taskSquares.push(null);
-  }
+    const task = square.data;
+    const mode = getCollaborationMode(task);
 
-  // Assign collaboration modes to tasks based on hash
-  const getCollaborationMode = (task: Task) => {
-    if (task.collaboration_mode) return task.collaboration_mode;
-
-    const hash = task.task.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    const modes = ['directive', 'feedback_loop', 'task_iteration', 'validation', 'learning'];
-    return modes[hash % modes.length];
-  };
-
-  const getSquareColor = (mode: string) => {
-    switch (mode) {
-      case 'directive':
-      case 'feedback_loop':
-        return '#5A9770'; // Sage green for automation
-      case 'task_iteration':
-      case 'validation':
-      case 'learning':
-        return '#B8A3D6'; // Lavender for augmentation
-      default:
-        return '#E8E4DC'; // Beige for no data
-    }
-  };
-
-  const getModeName = (mode: string) => {
-    const names: Record<string, string> = {
-      directive: 'Directive',
-      feedback_loop: 'Feedback Loop',
-      task_iteration: 'Task Iteration',
-      validation: 'Validation',
-      learning: 'Learning',
-    };
-    return names[mode] || mode;
-  };
-
-  const handleMouseEnter = (task: Task | null, event: React.MouseEvent) => {
-    if (task) {
-      setHoveredTask(task);
-      const rect = event.currentTarget.getBoundingClientRect();
-      setTooltipPosition({
-        x: rect.left + rect.width / 2,
-        y: rect.top,
-      });
-    }
-  };
-
-  const handleMouseLeave = () => {
-    setHoveredTask(null);
+    return (
+      <div className="space-y-1.5">
+        <div className="text-gray-100 leading-tight">
+          {task.task.charAt(0).toUpperCase() + task.task.slice(1)}
+        </div>
+        <div className="flex items-center justify-between gap-3 pt-1 border-t border-gray-700">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-2.5 h-2.5 rounded-sm"
+              style={{ backgroundColor: getSquareColor(mode) }}
+            />
+            <span className="text-gray-300 text-[11px]">{getModeName(mode)}</span>
+          </div>
+          <span className="font-medium text-[11px]">
+            {((task.metrics.onet_task_pct / totalUsage) * 100).toFixed(0)}%
+          </span>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="relative">
-      <div
-        className="grid gap-[2px]"
-        style={{
-          gridTemplateColumns: `repeat(${size}, 1fr)`,
-          gridTemplateRows: `repeat(${size}, 1fr)`,
-        }}
-      >
-        {taskSquares.map((task, index) => {
-          const mode = task ? getCollaborationMode(task) : 'none';
-          return (
-            <div
-              key={index}
-              className="aspect-square rounded-[1px] cursor-pointer transition-opacity hover:opacity-80 hover:ring-1 hover:ring-gray-400"
-              style={{ backgroundColor: getSquareColor(mode) }}
-              onMouseEnter={(e) => handleMouseEnter(task, e)}
-              onMouseLeave={handleMouseLeave}
-            />
-          );
-        })}
-      </div>
-
-      {/* Task tooltip */}
-      {hoveredTask && (
-        <div
-          className="fixed bg-gray-800 text-white px-3 py-2 rounded text-xs shadow-xl border border-gray-700 z-50 max-w-sm"
-          style={{
-            left: `${tooltipPosition.x}px`,
-            top: `${tooltipPosition.y - 10}px`,
-            transform: 'translate(-50%, -100%)',
-            pointerEvents: 'none',
-          }}
-        >
-          <div className="space-y-1.5">
-            <div className="text-gray-100 leading-tight">
-              {hoveredTask.task.charAt(0).toUpperCase() + hoveredTask.task.slice(1)}
-            </div>
-            <div className="flex items-center justify-between gap-3 pt-1 border-t border-gray-700">
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-2.5 h-2.5 rounded-sm"
-                  style={{
-                    backgroundColor: getSquareColor(
-                      getCollaborationMode(hoveredTask)
-                    ),
-                  }}
-                ></div>
-                <span className="text-gray-300 text-[11px]">
-                  {getModeName(getCollaborationMode(hoveredTask))}
-                </span>
-              </div>
-              <span className="font-medium text-[11px]">
-                {((hoveredTask.metrics.onet_task_pct / totalUsage) * 100).toFixed(0)}%
-              </span>
-            </div>
-          </div>
-          <div
-            className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1"
-            style={{ pointerEvents: 'none' }}
-          >
-            <div className="border-4 border-transparent border-t-gray-800"></div>
-          </div>
-        </div>
-      )}
-    </div>
+    <UnifiedWaffleChart
+      squares={squares}
+      size={size}
+      accessibleDescription={accessibleDescription}
+      renderTooltip={renderTooltip}
+      tooltipMode="fixed"
+    />
   );
 }

@@ -130,6 +130,57 @@ const config: Config = {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		boxShadow: {
+  			'soft': '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
+  			'soft-lg': '0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04)',
+  			'soft-xl': '0 16px 48px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04)',
+  			'glow-teal': '0 0 0 3px rgba(77, 202, 182, 0.1), 0 4px 12px rgba(77, 202, 182, 0.15)',
+  			'glow-sage': '0 0 0 3px rgba(90, 151, 112, 0.1), 0 4px 12px rgba(90, 151, 112, 0.15)',
+  		},
+  		keyframes: {
+  			'slide-up': {
+  				'0%': { transform: 'translateY(100%)', opacity: '0' },
+  				'100%': { transform: 'translateY(0)', opacity: '1' }
+  			},
+  			'shimmer': {
+  				'0%': { backgroundPosition: '-1000px 0' },
+  				'100%': { backgroundPosition: '1000px 0' }
+  			},
+  			'fade-in': {
+  				'0%': { opacity: '0', transform: 'translateY(10px)' },
+  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'fade-in-up': {
+  				'0%': { opacity: '0', transform: 'translateY(20px)' },
+  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'fade-in-down': {
+  				'0%': { opacity: '0', transform: 'translateY(-20px)' },
+  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'scale-in': {
+  				'0%': { opacity: '0', transform: 'scale(0.95)' },
+  				'100%': { opacity: '1', transform: 'scale(1)' }
+  			},
+  			'float': {
+  				'0%, 100%': { transform: 'translateY(0)' },
+  				'50%': { transform: 'translateY(-10px)' }
+  			},
+  			'pulse-glow': {
+  				'0%, 100%': { opacity: '1' },
+  				'50%': { opacity: '0.7' }
+  			}
+  		},
+  		animation: {
+  			'slide-up': 'slide-up 0.3s ease-out',
+  			'shimmer': 'shimmer 2s linear infinite',
+  			'fade-in': 'fade-in 0.3s ease-out',
+  			'fade-in-up': 'fade-in-up 0.6s ease-out',
+  			'fade-in-down': 'fade-in-down 0.6s ease-out',
+  			'scale-in': 'scale-in 0.2s ease-out',
+  			'float': 'float 3s ease-in-out infinite',
+  			'pulse-glow': 'pulse-glow 2s ease-in-out infinite'
   		}
   	}
   },
